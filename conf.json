@@ -1,0 +1,6 @@
+{
+  "src_table": "info",
+  "dest_table": "info",
+  "column_mapping": {"ID_": "id", "START_TIME_": "start_time"},
+  "column_transformation": {}
+}
