@@ -1,5 +1,8 @@
 import sys
 import json
+import urllib.request
+import StringIO
+import gzip
 
 from pyspark_cassandra import CassandraSparkContext
 from pyspark import SparkConf
@@ -14,7 +17,13 @@ conf = SparkConf() \
 
 sc = CassandraSparkContext(conf=conf)
 
-data = sc.textFile(sys.argv[3])
+#data = sc.textFile(sys.argv[3])
+request = urllib.Request(sys.argv[3])
+request.add_header('Accept-encoding', 'gzip')
+response = urllib.urlopen(request)
+buf = StringIO(response.read())
+f = gzip.GzipFile(fileobj=buf)
+data = f.read()
 
 confPath = SparkFiles.get("conf.json")
 with open(confPath) as f:
