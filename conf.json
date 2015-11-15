@@ -1,6 +1,6 @@
 {
   "src_table": "info",
   "dest_table": "info",
-  "column_mapping": {"ID_": "id", "START_TIME_": "start_time"},
-  "column_transformation": {}
+  "column_mapping": {"ID_": "id", "DURATION_": "start_time"},
+  "column_transformation": {"DURATION_": "toMilliseconds"}
 }
