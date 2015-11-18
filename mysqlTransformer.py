@@ -10,25 +10,28 @@ from pyspark_cassandra import CassandraSparkContext
 from pyspark import SparkConf
 from pyspark import SparkFiles
 
-# Takes arguments: Spark master, Cassandra host, location of the CSV file
+# Takes arguments: Spark master, Cassandra host, Minio host, path of the files
+sparkMaster = sys.argv[1]
+cassandraHost = sys.argv[2]
+minioHost = sys.argv[3]
+filePath = sys.argv[4]
 
 conf = SparkConf() \
     .setAppName("PySpark Cassandra Test") \
-    .setMaster(sys.argv[1]) \
-    .set("spark.cassandra.connection.host", sys.argv[2])
+    .setMaster(sparkMaster) \
+    .set("spark.cassandra.connection.host", cassandraHost)
 
 sc = CassandraSparkContext(conf=conf)
-
-#data = sc.textFile(sys.argv[3])
-res = urllib.request.urlopen("http://localhost:9000/test/Camunda_dump_example_csv.csv.gz")
-compressed = io.BytesIO(res.read())
-decompressed = gzip.GzipFile(fileobj=compressed)
-lines = decompressed.readlines()
-data = sc.parallelize(lines)
 
 confPath = SparkFiles.get("conf.json")
 with open(confPath) as f:
     conf = json.load(f)
+
+res = urllib.request.urlopen("http://"+minioHost+"/"+filePath+"_"+conf["src_table"]+".gz")
+compressed = io.BytesIO(res.read())
+decompressed = gzip.GzipFile(fileobj=compressed)
+lines = decompressed.readlines()
+data = sc.parallelize(lines)
 
 indexes = {}
 print(data.first())
