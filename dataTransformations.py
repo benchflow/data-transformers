@@ -1,3 +1,3 @@
 class Transformations():
-    def toMilliseconds(s):
+    def secondsToMilliseconds(s):
         return int(s)*1000
