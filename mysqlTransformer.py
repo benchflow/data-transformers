@@ -44,7 +44,7 @@ sc = CassandraSparkContext(conf=conf)
 confPath = SparkFiles.get("conf.json")
 with open(confPath) as f:
     maps = json.load(f)
-    mappings = mappings["map"]
+    mappings = mappings["settings"]
     
 for conf in mappings:
     # Retrieves the file from Minio and parallelize it for Spark
