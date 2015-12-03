@@ -1,10 +1,10 @@
-{ settings: 
+{ "settings": 
 	[
 		{
 		  "src_table": "info",
 		  "dest_table": "info",
-		  "column_mapping": {"ID_": "id", "DURATION_": "start_time"},
-		  "column_transformation": {"DURATION_": "secondsToMilliseconds"}
+		  "column_mapping": {"ID_": "id", "DURATION_": "duration"},
+		  "column_transformation": {}
 		}
 	]
 }

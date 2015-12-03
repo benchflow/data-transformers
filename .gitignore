@@ -1,3 +1,7 @@
 .idea/
 pyspark/
 pyspark_cassandra/
+
+*.pyc
+
+__pycache__/dataTransformations.cpython-35.pyc

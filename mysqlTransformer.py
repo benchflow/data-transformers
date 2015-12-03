@@ -10,11 +10,22 @@ from pyspark_cassandra import CassandraSparkContext
 from pyspark import SparkConf
 from pyspark import SparkFiles
 
+# Takes arguments: Spark master, Cassandra host, Minio host, path of the file
+sparkMaster = sys.argv[1]
+cassandraHost = sys.argv[2]
+minioHost = sys.argv[3]
+filePath = sys.argv[4]
+cassandraKeyspace = "benchflow"
+
+# Gets the benchmark ID from the minio file path
+benchmarkID = filePath.split("/")[2]
+#benchmarkID = "DJHBF"
+
 # This function creates a dictionary that acts as query to pass to Cassandra
 def createDic(a):
     d = {}
     if(a[0] == schema[0]):
-        return {"id":"0", "duration":"0"}
+        return None
     for i in indexes:
         col = conf["column_mapping"][i]
         t = conf["column_transformation"].get(i)
@@ -23,14 +34,8 @@ def createDic(a):
         else:
             tf = getattr(Transformations, t)
             d[col] = tf(a[indexes[i]])
+    d["trialid"] = benchmarkID
     return d
-
-# Takes arguments: Spark master, Cassandra host, Minio host, path of the file
-sparkMaster = sys.argv[1]
-cassandraHost = sys.argv[2]
-minioHost = sys.argv[3]
-filePath = sys.argv[4]
-cassandraKeyspace = "test"
 
 # Set configuration for spark context
 conf = SparkConf() \
@@ -44,11 +49,11 @@ sc = CassandraSparkContext(conf=conf)
 confPath = SparkFiles.get("conf.json")
 with open(confPath) as f:
     maps = json.load(f)
-    mappings = mappings["settings"]
+    mappings = maps["settings"]
     
 for conf in mappings:
     # Retrieves the file from Minio and parallelize it for Spark
-    res = urllib.request.urlopen("http://"+minioHost+"/"+filePath+"_"+conf["src_table"]+".gz")
+    res = urllib.request.urlopen("http://"+minioHost+":9000/"+filePath+"/"+conf["src_table"]+"csv.gz")
     compressed = io.BytesIO(res.read())
     decompressed = gzip.GzipFile(fileobj=compressed)
     lines = decompressed.readlines()
