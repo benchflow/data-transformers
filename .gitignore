@@ -4,4 +4,4 @@ pyspark_cassandra/
 
 *.pyc
 
-__pycache__/dataTransformations.cpython-35.pyc
+__pycache__/

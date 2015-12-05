@@ -1,6 +1,7 @@
 import sys
 import json
-import urllib.request
+#import urllib.request
+import urllib2
 import io
 import gzip
 
@@ -15,11 +16,9 @@ sparkMaster = sys.argv[1]
 cassandraHost = sys.argv[2]
 minioHost = sys.argv[3]
 filePath = sys.argv[4]
+benchmarkID = sys.argv[5]
 cassandraKeyspace = "benchflow"
-
-# Gets the benchmark ID from the minio file path
-benchmarkID = filePath.split("/")[2]
-#benchmarkID = "DJHBF"
+minioPort = 9000
 
 # This function creates a dictionary that acts as query to pass to Cassandra
 def createDic(a):
@@ -30,16 +29,23 @@ def createDic(a):
         col = conf["column_mapping"][i]
         t = conf["column_transformation"].get(i)
         if(t == None):
-            d[col] = a[indexes[i]]
+            d[col] = convertType(a[indexes[i]], col)
         else:
             tf = getattr(Transformations, t)
-            d[col] = tf(a[indexes[i]])
+            d[col] = convertType(tf(a[indexes[i]]), col)
     d["trialid"] = benchmarkID
     return d
 
+def convertType(element, column):
+    if types[column].startswith("varchar"):
+        return element
+    if types[column].startswith("int"):
+        return int(element)
+    raise ValueError
+
 # Set configuration for spark context
 conf = SparkConf() \
-    .setAppName("PySpark Cassandra Test") \
+    .setAppName("MYSQL Transformer") \
     .setMaster(sparkMaster) \
     .set("spark.cassandra.connection.host", cassandraHost)
 
@@ -52,12 +58,29 @@ with open(confPath) as f:
     mappings = maps["settings"]
     
 for conf in mappings:
-    # Retrieves the file from Minio and parallelize it for Spark
-    res = urllib.request.urlopen("http://"+minioHost+":9000/"+filePath+"/"+conf["src_table"]+"csv.gz")
+    # Retrieves file from Minio
+    #res = urllib.request.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"/"+conf["src_table"]+"csv.gz")
+    #compressed = io.BytesIO(res.read())
+    #decompressed = gzip.GzipFile(fileobj=compressed)
+    #lines = decompressed.readlines()
+    #data = sc.parallelize(lines)
+    
+    res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"/"+conf["src_table"]+".csv.gz")
     compressed = io.BytesIO(res.read())
     decompressed = gzip.GzipFile(fileobj=compressed)
     lines = decompressed.readlines()
     data = sc.parallelize(lines)
+    
+    res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"/"+conf["src_table"]+"_schema.csv.gz")
+    compressed = io.BytesIO(res.read())
+    decompressed = gzip.GzipFile(fileobj=compressed)
+    lines = decompressed.readlines()
+    
+    types = {}
+    for line in lines:
+        l = line.decode().split(",")
+        if l[0] != "Field":
+            types[l[0]] = l[1]
     
     # Sets up the dictionary to keep track of the index of a certain data in a CSV file line
     indexes = {}
