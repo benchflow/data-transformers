@@ -16,7 +16,6 @@ sparkMaster = sys.argv[1]
 cassandraHost = sys.argv[2]
 minioHost = sys.argv[3]
 filePath = sys.argv[4]
-benchmarkID = sys.argv[5]
 cassandraKeyspace = "benchflow"
 minioPort = 9000
 
@@ -33,7 +32,6 @@ def createDic(a):
         else:
             tf = getattr(Transformations, t)
             d[col] = convertType(tf(a[indexes[i]]), col)
-    d["trialid"] = benchmarkID
     return d
 
 def convertType(element, column):

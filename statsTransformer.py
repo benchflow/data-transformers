@@ -16,10 +16,9 @@ sparkMaster = sys.argv[1]
 cassandraHost = sys.argv[2]
 minioHost = sys.argv[3]
 filePath = sys.argv[4]
-benchmarkID = sys.argv[5]
 cassandraKeyspace = "benchflow"
-table = "environmentdata"
-minioPort = 9000
+table = "environment_data"
+minioPort = "9000"
 
 # Set configuration for spark context
 conf = SparkConf() \
@@ -45,15 +44,20 @@ data = sc.parallelize(lines)
 def createDict(a):
     ob = json.loads(a.decode())
     d = {}
+    if "total_usage" in ob['precpu_stats']['cpu_usage'].keys():
+        cpu_percent = 0.0
+        cpu_delta = ob["cpu_stats"]["cpu_usage"]["total_usage"] - ob['precpu_stats']['cpu_usage']['total_usage']
+        system_delta = ob["cpu_stats"]["system_cpu_usage"] - ob['precpu_stats']['system_cpu_usage']
+        if system_delta > 0 and cpu_delta > 0:
+            cpu_percent = 100.0 * cpu_delta / system_delta * len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
+        d["cpu_percent_usage"] = cpu_percent 
     d["id"] = uuid.uuid1()
-    d["environmentid"] = benchmarkID
-    d["time"] = ob["read"]
-    d["cputotal"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
-    d["memoryused"] = long(ob["memory_stats"]["usage"])
-    d["memorytot"] = long(ob["memory_stats"]["max_usage"])
-    #d["networkin"] = int(ob["network"]["rx_bytes"])
-    #d["networkout"] = int(ob["network"]["tx_bytes"])
-    d["trialid"] = "Something"
+    d["read_time"] = ob["read"]
+    d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
+    d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
+    d["memory_used"] = long(ob["memory_stats"]["usage"])
+    d["memory_max_usage"] = long(ob["memory_stats"]["max_usage"])
+    d["cpu_throttling_data"] = ob["cpu_stats"]["throttling_data"]
     return d
 
 # Calls Spark
