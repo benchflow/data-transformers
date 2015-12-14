@@ -16,6 +16,9 @@ sparkMaster = sys.argv[1]
 cassandraHost = sys.argv[2]
 minioHost = sys.argv[3]
 filePath = sys.argv[4]
+trialID = sys.argv[5]
+experimentID = trialID.split("_")[0]
+containerPropertiesID = sys.argv[6]
 cassandraKeyspace = "benchflow"
 table = "environment_data"
 minioPort = "9000"
@@ -51,7 +54,10 @@ def createDict(a):
         if system_delta > 0 and cpu_delta > 0:
             cpu_percent = 100.0 * cpu_delta / system_delta * len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
         d["cpu_percent_usage"] = cpu_percent 
-    d["id"] = uuid.uuid1()
+    d["environment_data_id"] = uuid.uuid1()
+    d["trial_id"] = trialID
+    d["experiment_id"] = experimentID
+    d["container_properties_id"] = containerPropertiesID
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
     d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
