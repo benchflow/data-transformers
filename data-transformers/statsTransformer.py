@@ -61,7 +61,7 @@ def createDict(a):
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
     d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
-    d["memory_used"] = long(ob["memory_stats"]["usage"])
+    d["memory_usage"] = long(ob["memory_stats"]["usage"])
     d["memory_max_usage"] = long(ob["memory_stats"]["max_usage"])
     d["cpu_throttling_data"] = ob["cpu_stats"]["throttling_data"]
     return d
