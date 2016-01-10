@@ -52,7 +52,7 @@ def convertType(element, column):
         return element
     if types[column].startswith("int"):
         return int(element)
-    raise ValueError
+    return element
 
 # Set configuration for spark context
 conf = SparkConf() \
@@ -91,7 +91,7 @@ for conf in mappings:
     for line in lines2:
         line = line.decode()
         l = line.split(",")
-        if l[0] != "Field":
+        if l[0].replace('"', '') != "Field":
             types[l[0].replace('"', '')] = l[1]
             
     print(types)
