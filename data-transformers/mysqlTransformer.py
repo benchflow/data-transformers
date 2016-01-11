@@ -33,7 +33,7 @@ def createDic(a):
     for i in indexes:
         col = conf["column_mapping"][i]
         t = conf["column_transformation"].get(i)
-        if(a[indexes[i]] == "NULL"):
+        if(a[indexes[i]].replace('"', '') == "NULL"):
             d[col] = None
         if(t == None):
             d[col] = convertType(a[indexes[i]].replace('"', ''), i)
