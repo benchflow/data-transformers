@@ -47,7 +47,7 @@ data = sc.parallelize(lines)
 def createDict(a):
     ob = json.loads(a.decode())
     d = {}
-    if "total_usage" in ob['precpu_stats']['cpu_usage'].keys():
+    if (ob['precpu_stats']['cpu_usage'] != None) and ("total_usage" in ob['precpu_stats']['cpu_usage'].keys()):
         cpu_percent = 0.0
         cpu_delta = ob["cpu_stats"]["cpu_usage"]["total_usage"] - ob['precpu_stats']['cpu_usage']['total_usage']
         system_delta = ob["cpu_stats"]["system_cpu_usage"] - ob['precpu_stats']['system_cpu_usage']
