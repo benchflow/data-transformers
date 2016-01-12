@@ -53,8 +53,9 @@ def createDict(a):
         cpu_percent = 0.0
         cpu_delta = ob["cpu_stats"]["cpu_usage"]["total_usage"] - ob["precpu_stats"]["cpu_usage"]["total_usage"]
         system_delta = ob["cpu_stats"]["system_cpu_usage"] - ob["precpu_stats"]["system_cpu_usage"]
-        cpu_percent = (100.0 * cpu_delta) / float(system_delta * len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"]))
-        d["cpu_percent_usage"] = cpu_percent 
+        if system_delta > 0 and cpu_delta > 0:
+            cpu_percent = 100.0 * (cpu_delta / float(system_delta * len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])))
+        d["cpu_percent_usage"] = "%.2f" % (cpu_percent)
     d["environment_data_id"] = uuid.uuid1()
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
