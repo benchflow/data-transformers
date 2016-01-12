@@ -67,4 +67,4 @@ def createDict(a):
 
 # Calls Spark
 query = data.map(createDict)
-query.saveToCassandra(cassandraKeyspace, table)
+query.saveToCassandra(cassandraKeyspace, table, ttl=timedelta(hours=1))

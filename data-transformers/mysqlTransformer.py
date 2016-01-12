@@ -112,4 +112,4 @@ for conf in mappings:
     
     # Uses Spark to map lines to Cassandra queries
     query = data.map(lambda line: line.decode().split(",")).map(createDic)
-    query.saveToCassandra(cassandraKeyspace, conf["dest_table"])
+    query.saveToCassandra(cassandraKeyspace, conf["dest_table"], ttl=timedelta(hours=1))
