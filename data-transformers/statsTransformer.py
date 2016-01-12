@@ -6,6 +6,8 @@ import io
 import gzip
 import uuid
 
+from datetime import timedelta
+
 from dataTransformations import Transformations
 
 from pyspark_cassandra import CassandraSparkContext
