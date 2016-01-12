@@ -5,6 +5,8 @@ import urllib2
 import io
 import gzip
 
+from datetime import timedelta
+
 from dataTransformations import Transformations
 
 from pyspark_cassandra import CassandraSparkContext
