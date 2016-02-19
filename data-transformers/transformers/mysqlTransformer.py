@@ -1,5 +1,6 @@
 import sys
 import json
+import yaml
 #import urllib.request
 import urllib2
 import io
@@ -20,7 +21,8 @@ minioHost = sys.argv[3]
 filePath = sys.argv[4]
 trialID = sys.argv[5]
 experimentID = trialID.split("_")[0]
-containerPropertiesID = sys.argv[6]
+SUTName = sys.argv[6]
+containerPropertiesID = sys.argv[7]
 cassandraKeyspace = "benchflow"
 minioPort = "9000"
 
@@ -66,9 +68,11 @@ conf = SparkConf() \
 sc = CassandraSparkContext(conf=conf)
 
 # Retrieve the configuration file that was sent to spark
-confPath = SparkFiles.get("conf.json")
+#confPath = SparkFiles.get("conf.json")
+confPath = SparkFiles.get(SUTName+".data-transformers.yml")
 with open(confPath) as f:
-    maps = json.load(f)
+    #maps = json.load(f)
+    maps = yaml.load(f)
     mappings = maps["settings"]
     
 for conf in mappings:
