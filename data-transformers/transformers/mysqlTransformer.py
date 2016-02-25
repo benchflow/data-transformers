@@ -36,7 +36,10 @@ def createDic(a):
         return d
     for i in indexes:
         col = conf["column_mapping"][i]
-        t = conf["column_transformation"].get(i)
+        if conf.get("column_transformation") != None:
+            t = conf["column_transformation"].get(i)
+        else:
+            t = None
         if(a[indexes[i]].replace('"', '') == "NULL"):
             d[col] = None
             continue
