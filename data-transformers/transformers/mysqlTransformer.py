@@ -122,3 +122,15 @@ for conf in mappings:
     # Uses Spark to map lines to Cassandra queries
     query = data.map(lambda line: line.decode().split(",")).map(createDic)
     query.saveToCassandra(cassandraKeyspace, conf["dest_table"], ttl=timedelta(hours=1))
+
+# Save Database size    
+res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"/database_table_sizes.csv.gz")
+compressed = io.BytesIO(res.read())
+decompressed = gzip.GzipFile(fileobj=compressed)
+lines = decompressed.readlines()
+lines = lines[1:]
+data = sc.parallelize(lines)
+
+# TODO: Use received dbms
+query = data.map(lambda line: line.decode().split(",")).map(lambda line: {"experiment_id":experimentID, "trial_id":trialID, "dbms":"TEMP", "database_name": line[0].replace('"', ''), "size":long(line[1].replace('"', ''))})
+query.saveToCassandra(cassandraKeyspace, "database_sizes", ttl=timedelta(hours=1))
