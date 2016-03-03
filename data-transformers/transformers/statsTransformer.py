@@ -21,6 +21,7 @@ filePath = sys.argv[4]
 trialID = sys.argv[5]
 experimentID = trialID.split("_")[0]
 containerPropertiesID = sys.argv[7]
+containerID = filePath.split("/")[-1].split("_")[0]
 cassandraKeyspace = "benchflow"
 table = "environment_data"
 minioPort = "9000"
@@ -46,7 +47,7 @@ lines = decompressed.readlines()
 data = sc.parallelize(lines)
 
 # Creates a dictionary
-def createDict(a):
+def createEDDict(a):
     ob = json.loads(a.decode())
     d = {}
     if (ob["precpu_stats"]["cpu_usage"] != None) and ("total_usage" in ob["precpu_stats"]["cpu_usage"].keys()):
@@ -59,7 +60,7 @@ def createDict(a):
     d["environment_data_id"] = uuid.uuid1()
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
-    d["container_properties_id"] = containerPropertiesID
+    d["container_id"] = containerID
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
     d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
@@ -69,5 +70,46 @@ def createDict(a):
     return d
 
 # Calls Spark
-query = data.map(createDict)
+query = data.map(createEDDict)
 query.saveToCassandra(cassandraKeyspace, table, ttl=timedelta(hours=1))
+
+
+
+IOData = json.loads(lines[-1].decode())
+devices = {}
+for dev in IOData["blkio_stats"]["io_service_bytes_recursive"]:
+    devices["device"+str(dev["major"])] = {}
+
+for dev in IOData["blkio_stats"]["io_service_bytes_recursive"]:
+    devName = "device"+str(dev["major"])
+    if "value" in dev.keys():
+        if dev["op"] == "Read":
+            devices[devName]["reads"] = dev["value"]
+        if dev["op"] == "Write":
+            devices[devName]["writes"] = dev["value"]
+        if dev["op"] == "Sync":
+            devices[devName]["sync"] = dev["value"]
+        if dev["op"] == "Async":
+            devices[devName]["async"] = dev["value"]
+        if dev["op"] == "Total":
+            devices[devName]["total"] = dev["value"]
+    else:
+        if dev["op"] == "Read":
+            devices[devName]["reads"] = 0
+        if dev["op"] == "Write":
+            devices[devName]["writes"] = 0
+        if dev["op"] == "Sync":
+            devices[devName]["sync"] = 0
+        if dev["op"] == "Async":
+            devices[devName]["async"] = 0
+        if dev["op"] == "Total":
+            devices[devName]["total"] = 0
+
+query = []
+for dev in devices.keys():
+    print(devices[dev])
+    query.append({"experiment_id":experimentID, "trial_id":trialID, "container_properties_id":containerPropertiesID, "device":dev, "reads":devices[dev]["reads"], \
+        "writes":devices[dev]["writes"], "sync":devices[dev]["sync"], "async":devices[dev]["async"], "total":devices[dev]["total"]})
+
+query = sc.parallelize(query)
+query.saveToCassandra(cassandraKeyspace, "io_data", ttl=timedelta(hours=1))
