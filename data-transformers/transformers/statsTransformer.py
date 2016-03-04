@@ -46,8 +46,6 @@ decompressed = gzip.GzipFile(fileobj=compressed)
 lines = decompressed.readlines()
 data = sc.parallelize(lines)
 
-ioDataId = uuid.uuid1()
-
 # Creates a dictionary
 def createEDDict(a):
     ob = json.loads(a.decode())
@@ -67,7 +65,6 @@ def createEDDict(a):
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
     d["container_id"] = containerID
-    d["io_data_id"] = ioDataId
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
     d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
@@ -76,46 +73,60 @@ def createEDDict(a):
     d["cpu_throttling_data"] = ob["cpu_stats"]["throttling_data"]
     return d
 
+def createIODict(a):
+    ob = json.loads(a.decode())
+    dicts = []
+    dd = {}
+    for dev in ob["blkio_stats"]["io_service_bytes_recursive"]:
+        dd["device"+str(dev["major"])] = {}
+    for dev in ob["blkio_stats"]["io_service_bytes_recursive"]:
+        devName = "device"+str(dev["major"])
+        if "value" in dev.keys():
+            if dev["op"] == "Read":
+                dd[devName]["reads"] = dev["value"]
+            if dev["op"] == "Write":
+                dd[devName]["writes"] = dev["value"]
+            if dev["op"] == "Sync":
+                dd[devName]["sync"] = dev["value"]
+            if dev["op"] == "Async":
+                dd[devName]["async"] = dev["value"]
+            if dev["op"] == "Total":
+                dd[devName]["total"] = dev["value"]
+    for k in dd.keys():
+        d = {}
+        d["io_data_id"] = uuid.uuid1()
+        d["trial_id"] = trialID
+        d["experiment_id"] = experimentID
+        d["container_id"] = containerID
+        d["device"] = k
+        if "reads" in dd[k].keys():
+            d["reads"] = dd[k]["reads"]
+        else:
+            d["reads"] = 0
+        if "writes" in dd[k].keys():
+            d["writes"] = dd[k]["writes"]
+        else:
+            d["writes"] = 0
+        if "sync" in dd[k].keys():
+            d["sync"] = dd[k]["sync"]
+        else:
+            d["sync"] = 0
+        if "async" in dd[k].keys():
+            d["async"] = dd[k]["async"]
+        else:
+            d["async"] = 0
+        if "total" in dd[k].keys():
+            d["total"] = dd[k]["total"]
+        else:
+            d["total"] = 0
+        dicts.append(d)
+    return dicts
+
+
 # Calls Spark
 query = data.map(createEDDict)
 query.saveToCassandra(cassandraKeyspace, table, ttl=timedelta(hours=1))
 
-
-IOData = json.loads(lines[-1].decode())
-devices = {}
-for dev in IOData["blkio_stats"]["io_service_bytes_recursive"]:
-    devices["device"+str(dev["major"])] = {}
-
-for dev in IOData["blkio_stats"]["io_service_bytes_recursive"]:
-    devName = "device"+str(dev["major"])
-    if "value" in dev.keys():
-        if dev["op"] == "Read":
-            devices[devName]["reads"] = dev["value"]
-        if dev["op"] == "Write":
-            devices[devName]["writes"] = dev["value"]
-        if dev["op"] == "Sync":
-            devices[devName]["sync"] = dev["value"]
-        if dev["op"] == "Async":
-            devices[devName]["async"] = dev["value"]
-        if dev["op"] == "Total":
-            devices[devName]["total"] = dev["value"]
-    else:
-        if dev["op"] == "Read":
-            devices[devName]["reads"] = 0
-        if dev["op"] == "Write":
-            devices[devName]["writes"] = 0
-        if dev["op"] == "Sync":
-            devices[devName]["sync"] = 0
-        if dev["op"] == "Async":
-            devices[devName]["async"] = 0
-        if dev["op"] == "Total":
-            devices[devName]["total"] = 0
-
-query = []
-for dev in devices.keys():
-    print(devices[dev])
-    query.append({"experiment_id":experimentID, "trial_id":trialID, "io_data_id":ioDataId, "container_id":containerID, "device":dev, "reads":devices[dev]["reads"], \
-        "writes":devices[dev]["writes"], "sync":devices[dev]["sync"], "async":devices[dev]["async"], "total":devices[dev]["total"]})
-
+query = data.map(createIODict).reduce(lambda a, b: a+b)
 query = sc.parallelize(query)
 query.saveToCassandra(cassandraKeyspace, "io_data", ttl=timedelta(hours=1))
