@@ -46,21 +46,24 @@ decompressed = gzip.GzipFile(fileobj=compressed)
 lines = decompressed.readlines()
 data = sc.parallelize(lines)
 
+ob = data[0]
+activeCpus = 0
+for c in ob["cpu_stats"]["cpu_usage"]["percpu_usage"]:
+    if c != 0:
+        activeCpus += 1
+
 # Creates a dictionary
 def createEDDict(a):
     ob = json.loads(a.decode())
     d = {}
-    activeCpus = 0
-    for c in ob["cpu_stats"]["cpu_usage"]["percpu_usage"]:
-        if c != 0:
-            activeCpus += 1
     if (ob["precpu_stats"]["cpu_usage"] != None) and ("total_usage" in ob["precpu_stats"]["cpu_usage"].keys()):
         cpu_percent = 0.0
         cpu_delta = ob["cpu_stats"]["cpu_usage"]["total_usage"] - ob["precpu_stats"]["cpu_usage"]["total_usage"]
         system_delta = ob["cpu_stats"]["system_cpu_usage"] - ob["precpu_stats"]["system_cpu_usage"]
         if system_delta > 0 and cpu_delta > 0:
             cpu_percent = 100.0 * (cpu_delta / float(system_delta * activeCpus))
-        d["cpu_percent_usage"] = "%.2f" % (cpu_percent)
+        #d["cpu_percent_usage"] = "%.2f" % (cpu_percent)
+        d["cpu_percent_usage"] = cpu_percent
     d["environment_data_id"] = uuid.uuid1()
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
@@ -68,8 +71,8 @@ def createEDDict(a):
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
     d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
-    d["memory_usage"] = long(ob["memory_stats"]["usage"]/1000000)
-    d["memory_max_usage"] = long(ob["memory_stats"]["max_usage"]/1000000)
+    d["memory_usage"] = long(ob["memory_stats"]["usage"]/1000000.0)
+    d["memory_max_usage"] = long(ob["memory_stats"]["max_usage"]/1000000.0)
     d["cpu_throttling_data"] = ob["cpu_stats"]["throttling_data"]
     return d
 
