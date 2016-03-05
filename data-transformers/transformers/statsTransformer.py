@@ -46,7 +46,7 @@ decompressed = gzip.GzipFile(fileobj=compressed)
 lines = decompressed.readlines()
 data = sc.parallelize(lines)
 
-ob = data[0]
+ob = lines[0]
 activeCpus = 0
 for c in ob["cpu_stats"]["cpu_usage"]["percpu_usage"]:
     if c != 0:
