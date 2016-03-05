@@ -71,8 +71,8 @@ def createEDDict(a):
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
     d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
-    d["memory_usage"] = long(ob["memory_stats"]["usage"]/1000000.0)
-    d["memory_max_usage"] = long(ob["memory_stats"]["max_usage"]/1000000.0)
+    d["memory_usage"] = float(ob["memory_stats"]["usage"]/1000000.0)
+    d["memory_max_usage"] = float(ob["memory_stats"]["max_usage"]/1000000.0)
     d["cpu_throttling_data"] = ob["cpu_stats"]["throttling_data"]
     return d
 
