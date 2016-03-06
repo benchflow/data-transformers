@@ -58,11 +58,11 @@ def createEDDict(a):
     d = {}
     if (ob["precpu_stats"]["cpu_usage"] != None) and ("total_usage" in ob["precpu_stats"]["cpu_usage"].keys()):
         cpu_percent = 0.0
-        cpu_delta = ob["cpu_stats"]["cpu_usage"]["total_usage"] - ob["precpu_stats"]["cpu_usage"]["total_usage"]
-        system_delta = ob["cpu_stats"]["system_cpu_usage"] - ob["precpu_stats"]["system_cpu_usage"]
-        if system_delta > 0 and cpu_delta > 0:
-            cpu_percent = 100.0 * (cpu_delta / float(system_delta * activeCpus))
-        #d["cpu_percent_usage"] = "%.2f" % (cpu_percent)
+        cpu_delta = float(ob["cpu_stats"]["cpu_usage"]["total_usage"]) - float(ob["precpu_stats"]["cpu_usage"]["total_usage"])
+        system_delta = float(ob["cpu_stats"]["system_cpu_usage"]) - float(ob["precpu_stats"]["system_cpu_usage"])
+        if system_delta > 0.0 and cpu_delta > 0.0:
+            cpu_percent = (cpu_delta / system_delta) * float(len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])) * 100.0
+            cpu_percent = cpu_percent/activeCpus
         d["cpu_percent_usage"] = cpu_percent
     d["environment_data_id"] = uuid.uuid1()
     d["trial_id"] = trialID
