@@ -5,6 +5,7 @@ import yaml
 import urllib2
 import io
 import gzip
+import numpy as np
 
 from datetime import timedelta
 
@@ -13,6 +14,7 @@ from datetime import timedelta
 from pyspark_cassandra import CassandraSparkContext
 from pyspark import SparkConf
 from pyspark import SparkFiles
+from builtins import True
 
 # Takes arguments: Spark master, Cassandra host, Minio host, path of the file
 sparkMaster = sys.argv[1]
@@ -26,13 +28,19 @@ containerPropertiesID = sys.argv[7]
 cassandraKeyspace = "benchflow"
 minioPort = "9000"
 
+def filterMock(a):
+    for e in a:
+        if limit in e:
+            return False
+    return True
+
 # This function creates a dictionary that acts as query to pass to Cassandra
 def createDic(a):
     d = {}
     if(a[0] == schema[0]):
         d["trial_id"] = trialID
         d["experiment_id"] = experimentID
-        d["process_instance_id"] = "000020f8-5c9c-11e5-8cb8-5af0dffbf049"
+        d["process_instance_id"] = uuid.uuid1()
         return d
     for i in indexes:
         col = conf["column_mapping"][i]
@@ -51,6 +59,7 @@ def createDic(a):
             #d[col] = convertType(tf(a[indexes[i]]), i)
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
+    d["process_instance_id"] = uuid.uuid1()
     return d
 
 def convertType(element, column):
@@ -77,6 +86,7 @@ with open(confPath) as f:
     #maps = json.load(f)
     maps = yaml.load(f)
     mappings = maps["settings"]
+    limit = maps["limit_process_string_id"]
     
 for conf in mappings:
     # Retrieves file from Minio
@@ -120,7 +130,7 @@ for conf in mappings:
     print(indexes)
     
     # Uses Spark to map lines to Cassandra queries
-    query = data.map(lambda line: line.decode().split(",")).map(createDic)
+    query = data.map(lambda line: line.decode().split(",")).filter(filterMock).map(createDic)
     query.saveToCassandra(cassandraKeyspace, conf["dest_table"], ttl=timedelta(hours=1))
 
 # Save Database size    
