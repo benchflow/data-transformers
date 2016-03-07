@@ -7,6 +7,8 @@ import io
 import gzip
 import numpy as np
 
+import uuid
+
 from datetime import timedelta
 
 #from dataTransformations import Transformations
