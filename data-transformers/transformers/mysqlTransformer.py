@@ -16,7 +16,7 @@ from datetime import timedelta
 from pyspark_cassandra import CassandraSparkContext
 from pyspark import SparkConf
 from pyspark import SparkFiles
-from builtins import True
+#from builtins import True
 
 # Takes arguments: Spark master, Cassandra host, Minio host, path of the file
 sparkMaster = sys.argv[1]
@@ -102,7 +102,7 @@ for conf in mappings:
     compressed = io.BytesIO(res.read())
     decompressed = gzip.GzipFile(fileobj=compressed)
     lines = decompressed.readlines()
-    data = sc.parallelize(lines)
+    data = sc.parallelize(lines[1:])
     
     res2 = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"/"+conf["src_table"]+"_schema.csv.gz")
     compressed2 = io.BytesIO(res2.read())
@@ -120,7 +120,7 @@ for conf in mappings:
     
     # Sets up the dictionary to keep track of the index of a certain data in a CSV file line
     indexes = {}
-    schema = data.first().decode().split(",")
+    schema = lines[0].decode().split(",")
     print(schema)
     
     # Fills the indexes dictionary with the correct indexes
