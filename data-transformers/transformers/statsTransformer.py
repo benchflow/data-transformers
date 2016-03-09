@@ -53,8 +53,8 @@ for l in lines:
     for c in ob["cpu_stats"]["cpu_usage"]["percpu_usage"]:
         if c != 0:
             acpus += 1
-        if acpus > activeCpus:
-            activeCpus = acpus
+    if acpus > activeCpus:
+        activeCpus = acpus
 
 # Creates a dictionary
 def createEDDict(a):
