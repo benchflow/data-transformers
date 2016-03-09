@@ -86,6 +86,7 @@ def createEDDict(a):
             perCpuUsages.append(cpu_percent)
     d["cpu_percpu_percent_usage"] = perCpuUsages
     d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
+    d["cpu_cores"] = len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
     d["memory_usage"] = float(ob["memory_stats"]["usage"]/1000000.0)
     d["memory_max_usage"] = float(ob["memory_stats"]["max_usage"]/1000000.0)
     d["cpu_throttling_data"] = ob["cpu_stats"]["throttling_data"]
