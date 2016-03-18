@@ -7,6 +7,4 @@ settings:
         END_TIME_: "end_time"
         PROC_DEF_ID_: "process_definition_id"
         PROC_INST_ID_: "source_process_instance_id"
-      column_transformation:
-        DURATION_: "secondsToMilliseconds"
 limit_process_string_id: "mock"
