@@ -21,6 +21,3 @@ ratings:
     - "Dockerfile"
     - "Dockerfile.test"
     - "Dockerfile.ci"
-
-exclude_paths:
-- "/test/**/*"
