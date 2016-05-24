@@ -1,63 +1,15 @@
 import sys
 import json
-#import urllib.request
 import urllib2
 import io
 import gzip
 import uuid
+import yaml
 
 from datetime import timedelta
 
-#from dataTransformations import Transformations
-
-from pyspark_cassandra import CassandraSparkContext
-from pyspark import SparkConf
-
-# Takes arguments: Spark master, Cassandra host, Minio host, path of the files
-sparkMaster = sys.argv[1]
-cassandraHost = sys.argv[2]
-minioHost = sys.argv[3]
-filePath = sys.argv[4]
-trialID = sys.argv[5]
-experimentID = trialID.split("_")[0]
-#containerID = filePath.split("/")[-1].split("_")[0]
-containerID = sys.argv[7]
-cassandraKeyspace = "benchflow"
-table = "environment_data"
-minioPort = "9000"
-
-# Set configuration for spark context
-conf = SparkConf() \
-    .setAppName("Stats Transformer") \
-    .setMaster(sparkMaster) \
-    .set("spark.cassandra.connection.host", cassandraHost)
-sc = CassandraSparkContext(conf=conf)
-
-# Retrieves file from Minio
-#res = urllib.request.urlopen("http://"+minioHost+":9000/"+filePath)
-#compressed = io.BytesIO(res.read())
-#decompressed = gzip.GzipFile(fileobj=compressed)
-#lines = decompressed.readlines()
-#data = sc.parallelize(lines)
-
-res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath)
-compressed = io.BytesIO(res.read())
-decompressed = gzip.GzipFile(fileobj=compressed)
-lines = decompressed.readlines()
-data = sc.parallelize(lines)
-
-activeCpus = 0
-for l in lines:
-    acpus = 0
-    ob = json.loads(l.decode())
-    for c in ob["cpu_stats"]["cpu_usage"]["percpu_usage"]:
-        if c != 0:
-            acpus += 1
-    if acpus > activeCpus:
-        activeCpus = acpus
-
 # Creates a dictionary
-def createEDDict(a):
+def createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus):
     ob = json.loads(a.decode())
     d = {}
     if (ob["precpu_stats"]["cpu_usage"] is not None) and ("total_usage" in ob["precpu_stats"]["cpu_usage"].keys()):
@@ -68,13 +20,13 @@ def createEDDict(a):
             cpu_percent = (cpu_delta / system_delta) * float(len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])) * 100.0
             cpu_percent = cpu_percent/activeCpus
         d["cpu_percent_usage"] = cpu_percent
-    d["environment_data_id"] = uuid.uuid1()
+    d["environment_data_id"] = uuid.uuid1().urn[9:]
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
     d["container_id"] = containerID
+    d["host_id"] = hostID
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
-    #d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
     perCpuUsages = []
     if (ob["precpu_stats"]["cpu_usage"] is not None) and ("percpu_usage" in ob["precpu_stats"]["cpu_usage"].keys()):
         for i in range(len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])):
@@ -91,7 +43,7 @@ def createEDDict(a):
     d["memory_max_usage"] = float(ob["memory_stats"]["max_usage"]/1000000.0)
     return d
 
-def createIODict(a):
+def createIODict(a, trialID, experimentID, containerID, hostID):
     ob = json.loads(a.decode())
     dicts = []
     dd = {}
@@ -116,10 +68,11 @@ def createIODict(a):
                 dd[devName]["total"] = dev["value"]
     for k in dd.keys():
         d = {}
-        d["io_data_id"] = uuid.uuid1()
+        d["io_data_id"] = uuid.uuid1().urn[9:]
         d["trial_id"] = trialID
         d["experiment_id"] = experimentID
         d["container_id"] = containerID
+        d["host_id"] = hostID
         d["device"] = k
         if "reads" in dd[k].keys():
             d["reads"] = dd[k]["reads"]
@@ -144,11 +97,71 @@ def createIODict(a):
         dicts.append(d)
     return dicts
 
+def getFromMinio(url):
+    from commons import getFromUrl
+    return getFromUrl(url)
 
-# Calls Spark
-query = data.map(createEDDict)
-query.saveToCassandra(cassandraKeyspace, "environment_data", ttl=timedelta(hours=1))
-
-query = data.map(createIODict).reduce(lambda a, b: a+b)
-query = sc.parallelize(query)
-query.saveToCassandra(cassandraKeyspace, "io_data", ttl=timedelta(hours=1))
+def main():
+    from pyspark_cassandra import CassandraSparkContext
+    from pyspark import SparkConf
+    from pyspark import SparkFiles
+    
+    # Takes arguments
+    minioHost = sys.argv[1]
+    filePath = sys.argv[2]
+    trialID = sys.argv[3]
+    experimentID = sys.argv[4]
+    #SUTName = sys.argv[5]
+    containerID = sys.argv[6]
+    hostID = sys.argv[7]
+    statsTable = "environment_data"
+    ioTable = "io_data"
+    alluxioHost = "localhost"
+    
+    # Set configuration for spark context
+    conf = SparkConf().setAppName("Stats Transformer")
+    sc = CassandraSparkContext(conf=conf)
+    
+    # Retrieve the configuration file that was sent to spark
+    #confPath = SparkFiles.get("data-transformers.yml")
+    #with open(confPath) as f:
+    #    transformerConfiguration = yaml.load(f)
+    #    cassandraKeyspace = transformerConfiguration["cassandra_keyspace"]
+    #    minioPort = transformerConfiguration["minio_port"]
+    
+    cassandraKeyspace = "benchflow"
+    minioPort = "9000"
+    
+    #res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath)
+    #compressed = io.BytesIO(res.read())
+    #decompressed = gzip.GzipFile(fileobj=compressed)
+    #lines = decompressed.readlines()
+    lines = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath)
+    data = sc.parallelize(lines)
+    
+    activeCpus = 0
+    for l in lines:
+        acpus = 0
+        ob = json.loads(l.decode())
+        for c in ob["cpu_stats"]["cpu_usage"]["percpu_usage"]:
+            if c != 0:
+                acpus += 1
+        if acpus > activeCpus:
+            activeCpus = acpus
+    
+    # Calls Spark
+    f = lambda a: createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus)
+    query = data.map(f)
+    try: 
+        query.saveAsTextFile("alluxio://"+alluxioHost+":19998/"+trialID+"_"+experimentID+"_"+containerID+"_"+hostID+"_environment_data")
+    except:
+        print("Could not save on alluxio file "+trialID+"_"+containerID+"_environment_data")
+    query.saveToCassandra(cassandraKeyspace, statsTable, ttl=timedelta(hours=1))
+    
+    f = lambda a: createIODict(a, trialID, experimentID, containerID, hostID)
+    query = data.map(f).reduce(lambda a, b: a+b)
+    query = sc.parallelize(query)
+    query.saveToCassandra(cassandraKeyspace, ioTable, ttl=timedelta(hours=1))
+    
+if __name__ == '__main__':
+    main()

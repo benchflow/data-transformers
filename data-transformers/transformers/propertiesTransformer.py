@@ -9,13 +9,14 @@ import yaml
 from datetime import timedelta
 
 # Creates a dictionary
-def createContainerDict(a, trialID, experimentID, containerID):
+def createContainerDict(a, trialID, experimentID, containerID, hostID):
     ob = json.loads(a.decode())
     d = {}
     d["container_properties_id"] = uuid.uuid1()
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
     d["container_id"] = containerID
+    d["host_id"] = hostID
     if "Hostname" in ob["Config"].keys():
         d["host_id"] = ob["Config"]["Hostname"]
     if "Env" in ob["Config"].keys():
@@ -196,7 +197,7 @@ def getFromMinio(url):
     from commons import getFromUrl
     return getFromUrl(url)
 
-def hostNeedsSaving(infoData, cassandraKeyspace):
+def hostNeedsSaving(sc, infoData, cassandraKeyspace):
     hostID = ""
     
     ob = json.loads(infoData.decode())
@@ -228,6 +229,7 @@ def main():
     experimentID = sys.argv[4]
     SUTName = sys.argv[5]
     containerID = sys.argv[6]
+    hostID = sys.argv[7]
     table = "container_properties"
     
     # Set configuration for spark context
@@ -235,19 +237,28 @@ def main():
     sc = CassandraSparkContext(conf=conf)
     
     # Retrieve the configuration file that was sent to spark
-    confPath = SparkFiles.get("data-transformers.yml")
-    with open(confPath) as f:
-        transformerConfiguration = yaml.load(f)
-        cassandraKeyspace = transformerConfiguration["cassandra_keyspace"]
-        minioPort = transformerConfiguration["minio_port"]
+    #confPath = SparkFiles.get("data-transformers.yml")
+    #with open(confPath) as f:
+    #    transformerConfiguration = yaml.load(f)
+    #    cassandraKeyspace = transformerConfiguration["cassandra_keyspace"]
+    #    minioPort = transformerConfiguration["minio_port"]
     
-    inspectData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_inspect.gz")[0]  
+    cassandraKeyspace = "benchflow"
+    minioPort = "9000"
+    
+    #res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"_inspect.gz")
+    #compressed = io.BytesIO(res.read())
+    #decompressed = gzip.GzipFile(fileobj=compressed)
+    #inspectData = decompressed.readline()
+    inspectData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_inspect.gz")[0]
+    
     #f = open('/Users/Gabo/Desktop/spark_inspect_tmp', 'r')
     #inspectData = f.readline()
     
-    query = createContainerDict(inspectData, trialID, experimentID, containerID)
+    query = createContainerDict(inspectData, trialID, experimentID, containerID, hostID)
     query = sc.parallelize([query])
     query.saveToCassandra(cassandraKeyspace, "container_properties", ttl=timedelta(hours=1))
+    
     
     infoData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_info.gz")[0] 
     #f = open('/Users/Gabo/Desktop/spark_info_tmp', 'r')
@@ -257,7 +268,7 @@ def main():
     #f = open('/Users/Gabo/Desktop/spark_version_tmp', 'r')
     #versionData = f.readline()
     
-    hostNotSaved = hostNeedsSaving(infoData, cassandraKeyspace)
+    hostNotSaved = hostNeedsSaving(sc, infoData, cassandraKeyspace)
         
     if hostNotSaved:
         query = createInfoDict(infoData)

@@ -1,0 +1,17 @@
+FROM gettyimages/spark
+
+ENV PYSPARK_PYTHON python2.7
+ENV PYTHONPATH /data-transformers/transformers:/data-transformers/transformations
+ENV TRANSFORMERS_PATH /data-transformers
+
+RUN apt-get update 
+RUN	apt-get -y install python-numpy python-scipy python-yaml python-tz
+	
+COPY $TRAVIS_BUILD_DIR/data-transformers /data-transformers
+COPY $TRAVIS_BUILD_DIR/test/python /test/python
+COPY $TRAVIS_BUILD_DIR/test/spark /test/spark
+COPY $TRAVIS_BUILD_DIR/test/runTests.sh /test/runTests.sh
+COPY $TRAVIS_BUILD_DIR/test/dependancies/pyspark-cassandra-assembly-0.3.5.jar /
+COPY $TRAVIS_BUILD_DIR/test/dependancies/log4j.properties $SPARK_HOME/conf/
+
+RUN chmod +x /test/runTests.sh

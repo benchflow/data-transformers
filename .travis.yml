@@ -1,17 +1,36 @@
 sudo: required
-dist: precise
+dist: trusty
 group: edge
 
 language: bash
 
 # whitelist
+
 branches:
   only:
     - dev
   except:
     - v-dev
 
-install: true
+before_install:
+  - docker build -f ./test/Dockerfile.ci -t sparktests .
+  - wget https://raw.githubusercontent.com/benchflow/benchflow/dev/database_schemas/cassandra/benchflow.cql -O ./test/data/benchflow.cql
+
+script:
+  - docker run -p 9000:9000 --name minio -e "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" -e "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d minio/minio /export
+  - sleep 20
+  - curl https://dl.minio.io/client/mc/release/linux-386/mc > mc
+  - chmod +x mc
+  - ./mc config host add minioAlias http://localhost:9000 AKIAIOSFODNN7EXAMPLE wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+  - ./mc mb minioAlias/runs
+  - ./mc access readwrite minioAlias/runs
+  - docker cp ./test/data/mockProcessEngine minio:/export/runs/
+  - docker cp ./test/data/mockStats minio:/export/runs/
+  - docker run -d --name cassandra cassandra:3.0
+  - sleep 20
+  - docker cp ./test/data/benchflow.cql cassandra:/
+  - docker exec cassandra cqlsh -f /benchflow.cql
+  - docker run --rm --name spark --link cassandra:cassandra --link minio:minio --entrypoint=/test/runTests.sh sparktests
 
 after_success:
   # Clean the v-dev release and tag we are using to release development version in CI
