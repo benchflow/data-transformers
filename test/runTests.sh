@@ -25,13 +25,7 @@ $SPARK_HOME/bin/spark-submit \
 --files $TRANSFORMERS_PATH/conf/data-transformers/camunda.data-transformers.yml \
 --py-files $PYSPARK_CASSANDRA,$TRANSFORMERS_PATH/commons/commons.py \
 $TRANSFORMERS_PATH/transformers/statsTransformer.py \
-$MINIO_HOST \
-"runs/mockStats/mockStats.gz" \
-$TRIAL_ID \
-$EXPERIMENT_ID \
-$SUT_NAME \
-"stats_camunda" \
-$HOST_NAME
+'{"minio_host": "'$MINIO_HOST'", "file_path": "runs/mockStats/mockStats.gz", "sut_name": "'$SUT_NAME'", "trial_id": "'$TRIAL_ID'", "experiment_id": "'$EXPERIMENT_ID'", "container_id": "stats_camunda", "host_id": "'$HOST_NAME'"}'
 if [ "$?" = "1" ]; then
 	exit 1
 fi
@@ -44,12 +38,7 @@ $SPARK_HOME/bin/spark-submit \
 --files $TRANSFORMERS_PATH/conf/data-transformers/camunda.data-transformers.yml \
 --py-files $PYSPARK_CASSANDRA,$TRANSFORMERS_PATH/commons/commons.py \
 $TRANSFORMERS_PATH/transformers/mysqlTransformer.py \
-$MINIO_HOST \
-"runs/mockProcessEngine" \
-$TRIAL_ID \
-$EXPERIMENT_ID \
-$SUT_NAME \
-"mysql_camunda"
+'{"minio_host": "'$MINIO_HOST'", "file_path": "runs/mockProcessEngine", "sut_name": "'$SUT_NAME'", "trial_id": "'$TRIAL_ID'", "experiment_id": "'$EXPERIMENT_ID'", "container_id": "mysql_camunda", "host_id": "'$HOST_NAME'"}'
 if [ "$?" = "1" ]; then
 	exit 1
 fi

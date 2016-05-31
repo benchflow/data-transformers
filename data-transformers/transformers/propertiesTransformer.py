@@ -223,13 +223,14 @@ def main():
     from pyspark import SparkFiles
     
     # Takes arguments
-    minioHost = sys.argv[1]
-    filePath = sys.argv[2]
-    trialID = sys.argv[3]
-    experimentID = sys.argv[4]
-    SUTName = sys.argv[5]
-    containerID = sys.argv[6]
-    hostID = sys.argv[7]
+    args = json.loads(sys.argv[1])
+    minioHost = str(args["minio_host"])
+    filePath = str(args["file_path"])
+    trialID = str(args["trial_id"])
+    experimentID = str(args["experiment_id"])
+    containerID = str(args["container_id"])
+    hostID = str(args["host_id"])
+    
     table = "container_properties"
     
     # Set configuration for spark context
@@ -246,27 +247,15 @@ def main():
     cassandraKeyspace = "benchflow"
     minioPort = "9000"
     
-    #res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"_inspect.gz")
-    #compressed = io.BytesIO(res.read())
-    #decompressed = gzip.GzipFile(fileobj=compressed)
-    #inspectData = decompressed.readline()
     inspectData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_inspect.gz")[0]
-    
-    #f = open('/Users/Gabo/Desktop/spark_inspect_tmp', 'r')
-    #inspectData = f.readline()
     
     query = createContainerDict(inspectData, trialID, experimentID, containerID, hostID)
     query = sc.parallelize([query])
-    query.saveToCassandra(cassandraKeyspace, "container_properties", ttl=timedelta(hours=1))
-    
+    query.saveToCassandra(cassandraKeyspace, "container_properties", ttl=timedelta(hours=1))  
     
     infoData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_info.gz")[0] 
-    #f = open('/Users/Gabo/Desktop/spark_info_tmp', 'r')
-    #infoData = f.readline()
     
     versionData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_version.gz")[0]
-    #f = open('/Users/Gabo/Desktop/spark_version_tmp', 'r')
-    #versionData = f.readline()
     
     hostNotSaved = hostNeedsSaving(sc, infoData, cassandraKeyspace)
         

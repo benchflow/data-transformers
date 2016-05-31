@@ -107,13 +107,14 @@ def main():
     from pyspark import SparkFiles
     
     # Takes arguments
-    minioHost = sys.argv[1]
-    filePath = sys.argv[2]
-    trialID = sys.argv[3]
-    experimentID = sys.argv[4]
-    #SUTName = sys.argv[5]
-    containerID = sys.argv[6]
-    hostID = sys.argv[7]
+    args = json.loads(sys.argv[1])
+    minioHost = str(args["minio_host"])
+    filePath = str(args["file_path"])
+    trialID = str(args["trial_id"])
+    experimentID = str(args["experiment_id"])
+    containerID = str(args["container_id"])
+    hostID = str(args["host_id"])
+    
     statsTable = "environment_data"
     ioTable = "io_data"
     alluxioHost = "localhost"
