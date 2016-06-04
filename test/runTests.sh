@@ -6,6 +6,8 @@ python2.7 /test/python/statsTests.py
 python2.7 /test/python/mysqlTests.py
 python2.7 /test/python/propertiesTests.py
 
+exit 0
+
 echo "Starting Spark tests"
 
 SPARK_MASTER=local[*]
