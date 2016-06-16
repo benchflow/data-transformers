@@ -43,6 +43,36 @@ def createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus):
     d["memory_max_usage"] = float(ob["memory_stats"]["max_usage"]/1000000.0)
     return d
 
+def createNetworkDict(a, trialID, experimentID, containerID, hostID):
+    ob = json.loads(a.decode())
+    dicts = []
+    for n in ob["networks"]:
+        d = {}
+        d["network_interface_data_id"] = uuid.uuid1().urn[9:]
+        d["trial_id"] = trialID
+        d["experiment_id"] = experimentID
+        d["container_id"] = containerID
+        d["host_id"] = hostID
+        d["network_interface_name"] = n
+        d["network_rx_bytes"] = ob["networks"][n]["rx_bytes"]
+        d["network_tx_bytes"] = ob["networks"][n]["tx_bytes"]
+        d["network_rx_packets"] = ob["networks"][n]["rx_packets"]
+        d["network_tx_packets"] = ob["networks"][n]["tx_packets"]
+        dicts.append(d)
+    return dicts
+
+def createHostNetworkDict(a, trialID, experimentID, containerID, hostID):
+    d = {}
+    d["network_interface_data_id"] = uuid.uuid1().urn[9:]
+    d["trial_id"] = trialID
+    d["experiment_id"] = experimentID
+    d["container_id"] = containerID
+    d["host_id"] = hostID
+    d["network_interface_name"] = "host"
+    d["network_tx_bytes"] = a[0]
+    d["network_rx_bytes"] = a[1]
+    return d
+
 def createIODict(a, trialID, experimentID, containerID, hostID):
     ob = json.loads(a.decode())
     dicts = []
@@ -97,9 +127,46 @@ def createIODict(a, trialID, experimentID, containerID, hostID):
         dicts.append(d)
     return dicts
 
-def getFromMinio(url):
-    from commons import getFromUrl
-    return getFromUrl(url)
+def getBytesSumForContainerPIDS(e, PIDS):
+    e = filter((lambda a: not "Refreshing" in a), e)
+    e = map((lambda a: a.strip("\n").split("\t")), e)
+    e = filter((lambda a: len(a) == 3 and a[0].split("/")[-2] in PIDS), e)
+    if len(e) == 0:
+        return (0, 0)
+    e = map((lambda a: (float(a[1])*1000,float(a[2])*1000)), e)
+    e = reduce((lambda a, b: (a[0]+b[0],a[1]+b[1])), e)
+    return e
+
+def createNetworkHostQuery(sc, top, net, trialID, experimentID, containerID, hostID):
+    def getPid(a):
+        data = json.loads(a.decode())
+        pids = []
+        for p in data["Processes"]:
+            pids.append(p[2])
+        return pids
+    PIDS = sc.parallelize(top).map(getPid).reduce(lambda a, b: a+b)
+    
+    netPerSecond = []
+    chunk = []
+    for line in net[1:]:
+        if "Refreshing" in line:
+            netPerSecond.append(chunk)
+            chunk = []
+        else:
+            chunk.append(line)
+
+    data = sc.parallelize(netPerSecond).map(lambda a: getBytesSumForContainerPIDS(a, PIDS)).collect()
+    i = 0
+    for i in range(len(data)-1):
+        data[i+1] = (data[i+1][0]+data[i][0], data[i+1][0]+data[i][1])
+    
+    f = lambda a: createHostNetworkDict(a, trialID, experimentID, containerID, hostID)
+    query = sc.parallelize(data).map(f).collect()
+    return query
+
+def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
+    from commons import getFromMinio
+    return getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path)
 
 def main():
     from pyspark_cassandra import CassandraSparkContext
@@ -108,7 +175,12 @@ def main():
     
     # Takes arguments
     args = json.loads(sys.argv[1])
+    cassandraKeyspace = str(args["cassandra_keyspace"])
     minioHost = str(args["minio_host"])
+    minioPort = str(args["minio_port"])
+    minioAccessKey = str(args["minio_access_key"])
+    minioSecretKey = str(args["minio_secret_key"])
+    fileBucket = str(args["file_bucket"])
     filePath = str(args["file_path"])
     trialID = str(args["trial_id"])
     experimentID = str(args["experiment_id"])
@@ -123,21 +195,7 @@ def main():
     conf = SparkConf().setAppName("Stats Transformer")
     sc = CassandraSparkContext(conf=conf)
     
-    # Retrieve the configuration file that was sent to spark
-    #confPath = SparkFiles.get("data-transformers.yml")
-    #with open(confPath) as f:
-    #    transformerConfiguration = yaml.load(f)
-    #    cassandraKeyspace = transformerConfiguration["cassandra_keyspace"]
-    #    minioPort = transformerConfiguration["minio_port"]
-    
-    cassandraKeyspace = "benchflow"
-    minioPort = "9000"
-    
-    #res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath)
-    #compressed = io.BytesIO(res.read())
-    #decompressed = gzip.GzipFile(fileobj=compressed)
-    #lines = decompressed.readlines()
-    lines = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath)
+    lines = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_stats.gz").readlines()
     data = sc.parallelize(lines)
     
     activeCpus = 0
@@ -150,7 +208,8 @@ def main():
         if acpus > activeCpus:
             activeCpus = acpus
     
-    # Calls Spark
+    # Saving Stats data
+    ####################
     f = lambda a: createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus)
     query = data.map(f)
     try: 
@@ -159,10 +218,41 @@ def main():
         print("Could not save on alluxio file "+trialID+"_"+containerID+"_environment_data")
     query.saveToCassandra(cassandraKeyspace, statsTable, ttl=timedelta(hours=1))
     
+    
+    # Saving IO Data
+    ####################
     f = lambda a: createIODict(a, trialID, experimentID, containerID, hostID)
     query = data.map(f).reduce(lambda a, b: a+b)
     query = sc.parallelize(query)
     query.saveToCassandra(cassandraKeyspace, ioTable, ttl=timedelta(hours=1))
+    
+    
+    #Saving Network data
+    ####################
+    firstStats = json.loads(lines[0].decode())
+    if "networks" in firstStats.keys() and len(firstStats) != 0:
+        networkDataAvailable = True
+    else:
+        networkDataAvailable = False
+    
+    if networkDataAvailable:
+        f = lambda a: createNetworkDict(a, trialID, experimentID, containerID, hostID)
+        query = statsRDD.map(f).reduce(lambda a, b: a+b)
+    else: 
+        net = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_network.gz")
+        net = net.readlines()
+        
+        top = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_top.gz")
+        top = top.readlines()
+        
+        query = createNetworkHostQuery(sc, top, net, trialID, experimentID, containerID, hostID)
+        
+    try: 
+        query.saveAsTextFile("alluxio://"+alluxioHost+":19998/"+trialID+"_"+containerID+"_environment_data")
+    except:
+        print("Could not save on alluxio file "+trialID+"_"+containerID+"_environment_data")
+        
+    sc.parallelize(query).saveToCassandra(cassandraKeyspace, "network_interface_data", ttl=timedelta(hours=1))
     
 if __name__ == '__main__':
     main()

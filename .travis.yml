@@ -6,8 +6,6 @@ language: bash
 
 # whitelist
 
-bundler_args: --retry 3
-
 branches:
   only:
     - dev
@@ -27,7 +25,7 @@ script:
   #- docker cp ./test/data/benchflow.cql cassandra:/
   #- docker exec cassandra cqlsh -f /benchflow.cql
   #- docker run --rm --name spark --link cassandra:cassandra --link minio:minio --entrypoint=/test/runTests.sh sparktests
-  - docker run --rm --name spark --entrypoint=/test/runTests.sh sparktests
+  - travis_retry docker run --rm --name spark --entrypoint=/test/runTests.sh sparktests
 
 after_success:
   # Clean the v-dev release and tag we are using to release development version in CI

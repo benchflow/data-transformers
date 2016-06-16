@@ -4,8 +4,8 @@ import yaml
 import urllib2
 import io
 import gzip
-
 import uuid
+import dateutil.parser as dateparser
 
 from datetime import timedelta
 
@@ -23,7 +23,6 @@ def createDic(a, trialID, experimentID, conf, types, schema, indexes):
     if(a[0] == schema[0]):
         d["trial_id"] = trialID
         d["experiment_id"] = experimentID
-        d["process_instance_id"] = uuid.uuid1().urn[9:]
         return d
     for i in indexes:
         col = conf["column_mapping"][i]
@@ -40,7 +39,6 @@ def createDic(a, trialID, experimentID, conf, types, schema, indexes):
             d[col] = eval("transformations."+t)(convertType(a[indexes[i]].replace('"', ''), i, types))
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
-    d["process_instance_id"] = uuid.uuid1().urn[9:]
     return d
 
 def convertType(element, column, types):
@@ -54,18 +52,76 @@ def convertType(element, column, types):
         return long(element)
     return element
 
-def getFromMinio(url):
-    from commons import getFromUrl
-    return getFromUrl(url)
+def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
+    from commons import getFromMinio
+    return getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path)
+        
+def cutNInitialProcesses(dataRDD, nToIgnore):
+    from pyspark_cassandra import CassandraSparkContext
+    from pyspark_cassandra import RowFormat
+    from pyspark import SparkConf
+    
+    def markToIgnore(e, maxTime, proc):
+        if e['process_definition_id'] == proc and dateparser.parse(e["start_time"]) <= maxTime:
+            e["to_ignore"] = True
+            return e
+        elif not "to_ignore" in e.keys(): 
+            e["to_ignore"] = False
+            return e
+        else:
+            return e
+    
+    if dataRDD.isEmpty():
+        return []
+    
+    processes = dataRDD.map(lambda r: r["process_definition_id"]) \
+            .distinct() \
+            .collect()
+    
+    for p in processes:
+        time = dataRDD.filter(lambda r: r["process_definition_id"] == p) \
+            .map(lambda r: (dateparser.parse(r["start_time"]), 0)) \
+            .sortByKey(1, 1) \
+            .take(nToIgnore)
+        if len(time) < nToIgnore:
+            continue
+        else:
+            time = time[-1][0]
+        
+        dataRDD = dataRDD.map(lambda e: markToIgnore(e, time, p))
+    return dataRDD
+
+def cutConstructs(dataRDD, processesToIgnore):
+    from pyspark_cassandra import CassandraSparkContext
+    from pyspark_cassandra import RowFormat
+    from pyspark import SparkConf
+    
+    def markToIgnore(e):
+        if e["process_instance_id"] in processesToIgnore:
+            e["to_ignore"] = True
+            return e
+        elif not "to_ignore" in e.keys(): 
+            e["to_ignore"] = False
+            return e
+        else:
+            return e
+    
+    return dataRDD.map(markToIgnore)
 
 def main():
     from pyspark_cassandra import CassandraSparkContext
     from pyspark import SparkConf
     from pyspark import SparkFiles
+    from pyspark import StorageLevel
     
     # Takes arguments
     args = json.loads(sys.argv[1])
+    cassandraKeyspace = str(args["cassandra_keyspace"])
     minioHost = str(args["minio_host"])
+    minioPort = str(args["minio_port"])
+    minioAccessKey = str(args["minio_access_key"])
+    minioSecretKey = str(args["minio_secret_key"])
+    fileBucket = str(args["file_bucket"])
     filePath = str(args["file_path"])
     trialID = str(args["trial_id"])
     experimentID = str(args["experiment_id"])
@@ -76,35 +132,23 @@ def main():
     sc = CassandraSparkContext(conf=conf)
     
     # Retrieve the configuration file that was sent to spark
-    #confPath = SparkFiles.get("data-transformers.yml")
-    #with open(confPath) as f:
-    #    transformerConfiguration = yaml.load(f)
-    #    cassandraKeyspace = transformerConfiguration["cassandra_keyspace"]
-    #    minioPort = transformerConfiguration["minio_port"]
-    
-    cassandraKeyspace = "benchflow"
-    minioPort = "9000"
-    
     confPath = SparkFiles.get(SUTName+".data-transformers.yml")
     with open(confPath) as f:
         transformerConfiguration = yaml.load(f)
         mappings = transformerConfiguration["settings"]
         limit = transformerConfiguration["limit_process_string_id"]
+        nProcessesToIgnore = transformerConfiguration["n_processes_to_ignore"]
+        
+    mappingsDict = {}
+    for conf in mappings:
+        mappingsDict[conf["dest_table"]] = conf
+    mappings = [mappingsDict["process"], mappingsDict["construct"]]
         
     for conf in mappings:
-        #res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"/"+conf["src_table"]+".csv.gz")
-        #compressed = io.BytesIO(res.read())
-        #decompressed = gzip.GzipFile(fileobj=compressed)
-        #lines = decompressed.readlines()
-        lines = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"/"+conf["src_table"]+".csv.gz")
+        lines = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"/"+conf["src_table"]+".csv.gz").readlines()
         data = sc.parallelize(lines[1:])
         
-        #res2 = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"/"+conf["src_table"]+"_schema.csv.gz")
-        #compressed2 = io.BytesIO(res2.read())
-        #decompressed2 = gzip.GzipFile(fileobj=compressed2)
-        #lines2 = decompressed2.readlines()
-        lines2 = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"/"+conf["src_table"]+"_schema.csv.gz")
-        
+        lines2 = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"/"+conf["src_table"]+"_schema.csv.gz").readlines()   
         types = {}
         for line in lines2:
             line = line.decode()
@@ -123,17 +167,21 @@ def main():
                     indexes[schema[i].replace('"', '')] = i
         
         # Uses Spark to map lines to Cassandra queries
-        f1 = lambda a: createDic(a, trialID, experimentID, conf, types, schema, indexes)
-        f2 = lambda a: filterMock(a, limit)
-        query = data.map(lambda line: line.decode().split(",")).filter(f2).map(f1)
+        query = data.map(lambda line: line.decode().split(",")) \
+                    .filter(lambda a: filterMock(a, limit)) \
+                    .map(lambda a: createDic(a, trialID, experimentID, conf, types, schema, indexes))
+        
+        cutProcesses = []
+        if conf["dest_table"] == "process":
+            query = cutNInitialProcesses(query, nProcessesToIgnore)
+            cutProcesses = query.filter(lambda a: a["to_ignore"] is True).map(lambda a: a["process_instance_id"]).collect()
+        elif conf["dest_table"] == "construct":
+            query = cutConstructs(query, cutProcesses)
+        
         query.saveToCassandra(cassandraKeyspace, conf["dest_table"], ttl=timedelta(hours=1))
     
     # Save Database size    
-    #res = urllib2.urlopen("http://"+minioHost+":"+minioPort+"/"+filePath+"/database_table_sizes.csv.gz")
-    #compressed = io.BytesIO(res.read())
-    #decompressed = gzip.GzipFile(fileobj=compressed)
-    #lines = decompressed.readlines()
-    lines = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"/database_table_sizes.csv.gz")
+    lines = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"/"+"database_table_sizes.csv.gz").readlines()
     data = sc.parallelize(lines[1:])
     
     # TODO: Use received dbms

@@ -5,7 +5,7 @@ ENV PYTHONPATH /data-transformers/transformers:/data-transformers/transformation
 ENV TRANSFORMERS_PATH /data-transformers
 
 RUN apt-get update 
-RUN	apt-get -y install python-numpy python-scipy python-yaml python-tz python-pip   
+RUN	apt-get -y install python-numpy python-scipy python-yaml python-tz python-pip python-dateutil
 RUN python2.7 /usr/bin/pip install minio
 	
 COPY $TRAVIS_BUILD_DIR/data-transformers /data-transformers

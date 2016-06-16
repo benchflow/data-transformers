@@ -9,14 +9,13 @@ import yaml
 from datetime import timedelta
 
 # Creates a dictionary
-def createContainerDict(a, trialID, experimentID, containerID, hostID):
+def createContainerDict(a, trialID, experimentID, containerID):
     ob = json.loads(a.decode())
     d = {}
     d["container_properties_id"] = uuid.uuid1()
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
     d["container_id"] = containerID
-    d["host_id"] = hostID
     if "Hostname" in ob["Config"].keys():
         d["host_id"] = ob["Config"]["Hostname"]
     if "Env" in ob["Config"].keys():
@@ -193,9 +192,10 @@ def createVersionDict(a):
             continue
     return d
 
-def getFromMinio(url):
-    from commons import getFromUrl
-    return getFromUrl(url)
+
+def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
+    from commons import getFromMinio
+    return getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path)
 
 def hostNeedsSaving(sc, infoData, cassandraKeyspace):
     hostID = ""
@@ -224,38 +224,31 @@ def main():
     
     # Takes arguments
     args = json.loads(sys.argv[1])
+    cassandraKeyspace = str(args["cassandra_keyspace"])
     minioHost = str(args["minio_host"])
+    minioPort = str(args["minio_port"])
+    minioAccessKey = str(args["minio_access_key"])
+    minioSecretKey = str(args["minio_secret_key"])
+    fileBucket = str(args["file_bucket"])
     filePath = str(args["file_path"])
     trialID = str(args["trial_id"])
     experimentID = str(args["experiment_id"])
     containerID = str(args["container_id"])
     hostID = str(args["host_id"])
     
-    table = "container_properties"
-    
     # Set configuration for spark context
     conf = SparkConf().setAppName("Properties Transformer")
     sc = CassandraSparkContext(conf=conf)
+     
+    inspectData = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_inspect.gz").readlines()[0] 
     
-    # Retrieve the configuration file that was sent to spark
-    #confPath = SparkFiles.get("data-transformers.yml")
-    #with open(confPath) as f:
-    #    transformerConfiguration = yaml.load(f)
-    #    cassandraKeyspace = transformerConfiguration["cassandra_keyspace"]
-    #    minioPort = transformerConfiguration["minio_port"]
-    
-    cassandraKeyspace = "benchflow"
-    minioPort = "9000"
-    
-    inspectData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_inspect.gz")[0]
-    
-    query = createContainerDict(inspectData, trialID, experimentID, containerID, hostID)
+    query = createContainerDict(inspectData, trialID, experimentID, containerID)
     query = sc.parallelize([query])
-    query.saveToCassandra(cassandraKeyspace, "container_properties", ttl=timedelta(hours=1))  
+    query.saveToCassandra(cassandraKeyspace, "container_properties", ttl=timedelta(hours=1))
     
-    infoData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_info.gz")[0] 
+    infoData = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_info.gz").readlines()[0]
     
-    versionData = getFromMinio("http://"+minioHost+":"+minioPort+"/"+filePath+"_version.gz")[0]
+    versionData = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_version.gz").readlines()[0]
     
     hostNotSaved = hostNeedsSaving(sc, infoData, cassandraKeyspace)
         
