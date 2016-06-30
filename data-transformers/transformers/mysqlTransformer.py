@@ -39,6 +39,8 @@ def createDic(a, trialID, experimentID, conf, types, schema, indexes):
             d[col] = eval("transformations."+t)(convertType(a[indexes[i]].replace('"', ''), i, types))
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
+    if "duration" not in d.keys() and "end_time" in d.keys() and "start_time" in d.keys():
+        d["duration"] = (dateparser.parse(d["end_time"]) - dateparser.parse(d["start_time"])).seconds
     return d
 
 def convertType(element, column, types):
@@ -97,7 +99,7 @@ def cutConstructs(dataRDD, processesToIgnore):
     from pyspark import SparkConf
     
     def markToIgnore(e):
-        if e["process_instance_id"] in processesToIgnore:
+        if e["source_process_instance_id"] in processesToIgnore:
             e["to_ignore"] = True
             return e
         elif not "to_ignore" in e.keys(): 
@@ -170,11 +172,11 @@ def main():
         query = data.map(lambda line: line.decode().split(",")) \
                     .filter(lambda a: filterMock(a, limit)) \
                     .map(lambda a: createDic(a, trialID, experimentID, conf, types, schema, indexes))
-        
+                    
         cutProcesses = []
         if conf["dest_table"] == "process":
             query = cutNInitialProcesses(query, nProcessesToIgnore)
-            cutProcesses = query.filter(lambda a: a["to_ignore"] is True).map(lambda a: a["process_instance_id"]).collect()
+            cutProcesses = query.filter(lambda a: a["to_ignore"] is True).map(lambda a: a["source_process_instance_id"]).collect()
         elif conf["dest_table"] == "construct":
             query = cutConstructs(query, cutProcesses)
         

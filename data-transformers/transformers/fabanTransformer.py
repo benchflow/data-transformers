@@ -4,6 +4,7 @@ import uuid
 import xml.etree.ElementTree as xml
 import threading
 from datetime import timedelta
+import dateutil.parser as dateparser
 
 def createRunInfoQuery(data, trialID, experimentID, host):
     query = {}
@@ -16,6 +17,7 @@ def createRunInfoQuery(data, trialID, experimentID, host):
     query["run_id"] = benchSum.find("runId").text
     query["start_time"] = benchSum.find("startTime").text
     query["end_time"] = benchSum.find("endTime").text
+    query["duration"] = (dateparser.parse(query["end_time"]) - dateparser.parse(query["start_time"])).seconds
     query["metric_unit"] = benchSum.find("metric").attrib["unit"]
     query["metric_value"] = benchSum.find("metric").text
     query["passed"] = benchSum.find("passed").text

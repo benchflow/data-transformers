@@ -5,13 +5,10 @@ from minio import Minio
 
 def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
     minioClient = Minio(minioHost+":"+minioPort, access_key=accessKey, secret_key=secretKey, secure=False)
-    try:
-        data = minioClient.get_object(bucket, path)
-        compressed = io.BytesIO(data.read())
-        decompressed = gzip.GzipFile(fileobj=compressed)
-        return decompressed
-    except ResponseError as err:
-        print(err)
+    data = minioClient.get_object(bucket, path)
+    compressed = io.BytesIO(data.read())
+    decompressed = gzip.GzipFile(fileobj=compressed)
+    return decompressed
         
 def getMinioPaths(minioHost, minioPort, accessKey, secretKey, bucket, path):
     minioClient = Minio(minioHost+":"+minioPort, access_key=accessKey, secret_key=secretKey, secure=False)

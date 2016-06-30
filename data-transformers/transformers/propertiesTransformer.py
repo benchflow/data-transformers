@@ -9,15 +9,14 @@ import yaml
 from datetime import timedelta
 
 # Creates a dictionary
-def createContainerDict(a, trialID, experimentID, containerID):
+def createContainerDict(a, trialID, experimentID, containerID, hostID):
     ob = json.loads(a.decode())
     d = {}
     d["container_properties_id"] = uuid.uuid1()
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
     d["container_id"] = containerID
-    if "Hostname" in ob["Config"].keys():
-        d["host_id"] = ob["Config"]["Hostname"]
+    d["host_id"] = hostID
     if "Env" in ob["Config"].keys():
         d["environment"] = ob["Config"]["Env"]
     if "Image" in ob.keys():
@@ -120,11 +119,11 @@ def createInfoDict(a):
         elif data[0] == "Labels":
             d["labels"] = data[1]
             continue
-        elif data[0] == "KernelMemory":
-            d["mem_total"] = data[1]
-            continue
         elif data[0] == "MemoryLimit":
             d["memory_limit"] = data[1]
+            continue
+        elif data[0] == "MemTotal":
+            d["mem_total"] = data[1]
             continue
         elif data[0] == "NCPU":
             d["n_cpu"] = data[1]
@@ -242,7 +241,7 @@ def main():
      
     inspectData = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_inspect.gz").readlines()[0] 
     
-    query = createContainerDict(inspectData, trialID, experimentID, containerID)
+    query = createContainerDict(inspectData, trialID, experimentID, containerID, hostID)
     query = sc.parallelize([query])
     query.saveToCassandra(cassandraKeyspace, "container_properties", ttl=timedelta(hours=1))
     
