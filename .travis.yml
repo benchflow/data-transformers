@@ -17,15 +17,16 @@ before_install:
   - wget https://raw.githubusercontent.com/benchflow/benchflow/dev/database_schemas/cassandra/benchflow.cql -O ./test/data/benchflow.cql
 
 script:
-  #- docker run -p 9000:9000 --name minio -e "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" -e "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d minio/minio /export
-  #- sleep 20
-  #- docker cp ./test/data/runs minio:/export/
-  #- docker run -d --name cassandra cassandra:3.0
-  #- sleep 20
-  #- docker cp ./test/data/benchflow.cql cassandra:/
-  #- docker exec cassandra cqlsh -f /benchflow.cql
-  #- docker run --rm --name spark --link cassandra:cassandra --link minio:minio --entrypoint=/test/runTests.sh sparktests
-  - travis_retry docker run --rm --name spark --entrypoint=/test/runTests.sh sparktests
+  - docker run --name minio -e "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" -e "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d minio/minio /export
+  - sleep 60
+  - docker cp ./test/data/runs minio:/export/runs
+  - docker run -d --name cassandra cassandra:3.0
+  - sleep 60
+  - docker run -d --name cassandra2 --link cassandra:cassandra cassandra:3.0
+  - sleep 60
+  - docker cp ./test/data/benchflow.cql cassandra:/
+  - docker exec cassandra cqlsh -f /benchflow.cql
+  - travis_wait 30 docker run --rm --name spark --link minio:minio --link cassandra:cassandra --entrypoint=/test/runTests.sh sparktests
 
 after_success:
   # Clean the v-dev release and tag we are using to release development version in CI

@@ -39,8 +39,8 @@ def createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus):
     d["cpu_percpu_percent_usage"] = perCpuUsages
     d["cpu_percpu_usage"] = map(long, ob["cpu_stats"]["cpu_usage"]["percpu_usage"])
     d["cpu_cores"] = activeCpus
-    d["memory_usage"] = float(ob["memory_stats"]["usage"]/1000000.0)
-    d["memory_max_usage"] = float(ob["memory_stats"]["max_usage"]/1000000.0)
+    d["memory_usage"] = float(ob["memory_stats"]["usage"]/(1024*1024))
+    d["memory_max_usage"] = float(ob["memory_stats"]["max_usage"]/(1024*1024))
     return d
 
 def createNetworkDict(a, trialID, experimentID, containerID, hostID):

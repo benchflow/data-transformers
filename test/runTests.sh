@@ -6,14 +6,13 @@ python2.7 /test/python/statsTests.py
 python2.7 /test/python/mysqlTests.py
 python2.7 /test/python/propertiesTests.py
 
-exit 0
-
 echo "Starting Spark tests"
 
 SPARK_MASTER=local[*]
 PYSPARK_CASSANDRA=/pyspark-cassandra-assembly-0.3.5.jar
 CASSANDRA_HOST=cassandra
 MINIO_HOST="minio"
+MINIO_PORT="9000"
 TRIAL_ID="camundaZZZZZZMV_ZZZZZZMV"
 EXPERIMENT_ID="camundaZZZZZZMV"
 SUT_NAME="camunda"
@@ -27,10 +26,11 @@ $SPARK_HOME/bin/spark-submit \
 --files $TRANSFORMERS_PATH/conf/data-transformers/camunda.data-transformers.yml \
 --py-files $PYSPARK_CASSANDRA,$TRANSFORMERS_PATH/commons/commons.py \
 $TRANSFORMERS_PATH/transformers/statsTransformer.py \
-'{"minio_host": "'$MINIO_HOST'", "file_path": "runs/mockStats/mockStats.gz", "sut_name": "'$SUT_NAME'", "trial_id": "'$TRIAL_ID'", "experiment_id": "'$EXPERIMENT_ID'", "container_id": "stats_camunda", "host_id": "'$HOST_NAME'"}'
+'{"cassandra_keyspace":"benchflow", "minio_host": "'$MINIO_HOST'", "minio_port":"'$MINIO_PORT'", "minio_access_key":"AKIAIOSFODNN7EXAMPLE", "minio_secret_key":"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "file_bucket":"runs", "file_path": "mockStats/mock", "sut_name": "'$SUT_NAME'", "trial_id": "'$TRIAL_ID'", "experiment_id": "'$EXPERIMENT_ID'", "container_id": "stats_camunda", "host_id": "'$HOST_NAME'"}'
 if [ "$?" = "1" ]; then
 	exit 1
 fi
+sleep 5
 
 $SPARK_HOME/bin/spark-submit \
 --master $SPARK_MASTER \
@@ -40,10 +40,11 @@ $SPARK_HOME/bin/spark-submit \
 --files $TRANSFORMERS_PATH/conf/data-transformers/camunda.data-transformers.yml \
 --py-files $PYSPARK_CASSANDRA,$TRANSFORMERS_PATH/commons/commons.py \
 $TRANSFORMERS_PATH/transformers/mysqlTransformer.py \
-'{"minio_host": "'$MINIO_HOST'", "file_path": "runs/mockProcessEngine", "sut_name": "'$SUT_NAME'", "trial_id": "'$TRIAL_ID'", "experiment_id": "'$EXPERIMENT_ID'", "container_id": "mysql_camunda", "host_id": "'$HOST_NAME'"}'
+'{"cassandra_keyspace":"benchflow", "minio_host": "'$MINIO_HOST'", "minio_port":"'$MINIO_PORT'", "minio_access_key":"AKIAIOSFODNN7EXAMPLE", "minio_secret_key":"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", "file_bucket":"runs", "file_path": "mockProcessEngine", "sut_name": "'$SUT_NAME'", "trial_id": "'$TRIAL_ID'", "experiment_id": "'$EXPERIMENT_ID'", "container_id": "mysql_camunda", "host_id": "'$HOST_NAME'"}'
 if [ "$?" = "1" ]; then
 	exit 1
 fi
+sleep 5
 
 for SCRIPT in "cassandraTest"
 do 
@@ -58,5 +59,6 @@ do
 		exit 1
 	fi
 done
+sleep 5
 
 exit 0
