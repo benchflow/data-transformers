@@ -11,6 +11,7 @@ RUN python2.7 /usr/bin/pip install minio
 COPY $TRAVIS_BUILD_DIR/data-transformers /data-transformers
 COPY $TRAVIS_BUILD_DIR/test/python /test/python
 COPY $TRAVIS_BUILD_DIR/test/spark /test/spark
+COPY $TRAVIS_BUILD_DIR/test/sut /test/sut
 COPY $TRAVIS_BUILD_DIR/test/runTests.sh /test/runTests.sh
 COPY $TRAVIS_BUILD_DIR/test/dependencies/pyspark-cassandra-assembly-0.3.5.jar /
 COPY $TRAVIS_BUILD_DIR/test/dependencies/log4j.properties $SPARK_HOME/conf/
