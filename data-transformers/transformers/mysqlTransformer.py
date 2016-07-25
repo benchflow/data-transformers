@@ -127,14 +127,15 @@ def main():
     filePath = str(args["file_path"])
     trialID = str(args["trial_id"])
     experimentID = str(args["experiment_id"])
-    SUTName = str(args["sut_name"])
+    # SUTName = str(args["sut_name"])
+    configFile = str(args["config_file"])
     
     # Set configuration for spark context
     conf = SparkConf().setAppName("MYSQL Transformer")
     sc = CassandraSparkContext(conf=conf)
     
     # Retrieve the configuration file that was sent to spark
-    confPath = SparkFiles.get(SUTName+".data-transformers.yml")
+    confPath = SparkFiles.get(configFile)
     with open(confPath) as f:
         transformerConfiguration = yaml.load(f)
         mappings = transformerConfiguration["settings"]
@@ -187,7 +188,7 @@ def main():
     data = sc.parallelize(lines[1:])
     
     # TODO: Use received dbms
-    query = data.map(lambda line: line.decode().split(",")).map(lambda line: {"experiment_id":experimentID, "trial_id":trialID, "dbms":SUTName, "database_name": line[0].replace('"', ''), "size":long(line[1].replace('"', ''))})
+    query = data.map(lambda line: line.decode().split(",")).map(lambda line: {"experiment_id":experimentID, "trial_id":trialID, "dbms":"MySQL", "database_name": line[0].replace('"', ''), "size":long(line[1].replace('"', ''))})
     query.saveToCassandra(cassandraKeyspace, "database_sizes", ttl=timedelta(hours=1))
     
 if __name__ == '__main__':
