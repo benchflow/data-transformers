@@ -14,7 +14,7 @@ branches:
 
 before_install:
   - docker build -f ./test/Dockerfile.ci -t sparktests .
-  - wget https://raw.githubusercontent.com/benchflow/benchflow/dev/database_schemas/cassandra/benchflow.cql -O ./test/data/benchflow.cql
+  - wget https://raw.githubusercontent.com/benchflow/docker-images/dev/cassandra/data/benchflow.cql -O ./test/data/benchflow.cql
 
 script:
   - docker run --name minio -e "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" -e "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d minio/minio /export
