@@ -20,9 +20,9 @@ script:
   - docker run --name minio -e "MINIO_ALIAS=benchflow" -e "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" -e "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -ti --rm benchflow/minio:dev /data
   - sleep 60
   - docker cp ./test/data/runs minio:/data/runs
-  - docker run -d --name cassandra cassandra:3.0
+  - docker run -d --name cassandra cassandra:3.7
   - sleep 60
-  - docker run -d --name cassandra2 --link cassandra:cassandra cassandra:3.0
+  - docker run -d --name cassandra2 --link cassandra:cassandra cassandra:3.7
   - sleep 60
   - docker cp ./test/data/benchflow.cql cassandra:/
   - docker exec cassandra cqlsh -f /benchflow.cql
