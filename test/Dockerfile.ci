@@ -1,12 +1,8 @@
-FROM gettyimages/spark:1.6.2-hadoop-2.6
+FROM benchflow/data-analyses-scheduler:dev
 
 ENV PYSPARK_PYTHON python2.7
 ENV PYTHONPATH /data-transformers/transformers:/data-transformers/transformations
 ENV TRANSFORMERS_PATH /data-transformers
-
-RUN apt-get update 
-RUN	apt-get -y install python-numpy python-scipy python-yaml python-tz python-pip python-dateutil
-RUN python2.7 /usr/bin/pip install minio
 	
 COPY $TRAVIS_BUILD_DIR/data-transformers /data-transformers
 COPY $TRAVIS_BUILD_DIR/test/python /test/python
