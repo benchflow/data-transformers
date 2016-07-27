@@ -1,13 +1,13 @@
 transformers_settings: 
     - topic: "stats"
       scripts: 
-        - script: "/data-transformers/transformers/statsTransformer.py"
+        - script: "data-transformers/transformers/statsTransformer.py"
     - topic: "mysql"
       scripts: 
-        - script: "/data-transformers/transformers/mysqlTransformer.py"
+        - script: "data-transformers/transformers/mysqlTransformer.py"
     - topic: "properties"
       scripts: 
-        - script: "/data-transformers/transformers/propertiesTransformer.py"
+        - script: "data-transformers/transformers/propertiesTransformer.py"
     - topic: "faban"
       scripts: 
-        - script: "/data-transformers/transformers/fabanTransformer.py"
+        - script: "data-transformers/transformers/fabanTransformer.py"
