@@ -129,6 +129,7 @@ def main():
     experimentID = str(args["experiment_id"])
     # SUTName = str(args["sut_name"])
     configFile = str(args["config_file"])
+    partitionsPerCore = 5
     
     # Set configuration for spark context
     conf = SparkConf().setAppName("MYSQL Transformer")
@@ -149,7 +150,7 @@ def main():
         
     for conf in mappings:
         lines = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"/"+conf["src_table"]+".csv.gz").readlines()
-        data = sc.parallelize(lines[1:])
+        data = sc.parallelize(lines[1:], sc.defaultParallelism * partitionsPerCore)
         
         lines2 = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"/"+conf["src_table"]+"_schema.csv.gz").readlines()   
         types = {}
@@ -181,15 +182,15 @@ def main():
         elif conf["dest_table"] == "construct":
             query = cutConstructs(query, cutProcesses)
         
-        query.saveToCassandra(cassandraKeyspace, conf["dest_table"], ttl=timedelta(hours=1))
+        query.saveToCassandra(cassandraKeyspace, conf["dest_table"])
     
     # Save Database size    
     lines = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"/"+"database_table_sizes.csv.gz").readlines()
-    data = sc.parallelize(lines[1:])
+    data = sc.parallelize(lines[1:], sc.defaultParallelism * partitionsPerCore)
     
     # TODO: Use received dbms
     query = data.map(lambda line: line.decode().split(",")).map(lambda line: {"experiment_id":experimentID, "trial_id":trialID, "dbms":"MySQL", "database_name": line[0].replace('"', ''), "size":long(line[1].replace('"', ''))})
-    query.saveToCassandra(cassandraKeyspace, "database_sizes", ttl=timedelta(hours=1))
+    query.saveToCassandra(cassandraKeyspace, "database_sizes")
     
 if __name__ == '__main__':
     main()

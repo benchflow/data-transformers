@@ -186,6 +186,7 @@ def main():
     experimentID = str(args["experiment_id"])
     containerID = str(args["container_id"])
     hostID = str(args["host_id"])
+    partitionsPerCore = 5
     
     statsTable = "environment_data"
     ioTable = "io_data"
@@ -196,7 +197,7 @@ def main():
     sc = CassandraSparkContext(conf=conf)
     
     lines = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_stats.gz").readlines()
-    data = sc.parallelize(lines)
+    data = sc.parallelize(lines, sc.defaultParallelism * partitionsPerCore)
     
     activeCpus = 0
     for l in lines:
@@ -216,15 +217,15 @@ def main():
         query.saveAsTextFile("alluxio://"+alluxioHost+":19998/"+trialID+"_"+experimentID+"_"+containerID+"_"+hostID+"_environment_data")
     except:
         print("Could not save on alluxio file "+trialID+"_"+containerID+"_environment_data")
-    query.saveToCassandra(cassandraKeyspace, statsTable, ttl=timedelta(hours=1))
+    query.saveToCassandra(cassandraKeyspace, statsTable)
     
     
     # Saving IO Data
     ####################
     f = lambda a: createIODict(a, trialID, experimentID, containerID, hostID)
     query = data.map(f).reduce(lambda a, b: a+b)
-    query = sc.parallelize(query)
-    query.saveToCassandra(cassandraKeyspace, ioTable, ttl=timedelta(hours=1))
+    query = sc.parallelize(query, sc.defaultParallelism * partitionsPerCore)
+    query.saveToCassandra(cassandraKeyspace, ioTable)
     
     
     #Saving Network data
@@ -252,7 +253,7 @@ def main():
     except:
         print("Could not save on alluxio file "+trialID+"_"+containerID+"_environment_data")
         
-    sc.parallelize(query).saveToCassandra(cassandraKeyspace, "network_interface_data", ttl=timedelta(hours=1))
+    sc.parallelize(query).saveToCassandra(cassandraKeyspace, "network_interface_data")
     
 if __name__ == '__main__':
     main()

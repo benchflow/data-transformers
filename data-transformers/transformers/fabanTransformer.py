@@ -187,6 +187,7 @@ def main():
     filePath = str(args["file_path"])
     trialID = str(args["trial_id"])
     experimentID = str(args["experiment_id"])
+    partitionsPerCore = 5
     
     # Set configuration for spark context
     conf = SparkConf().setAppName("Faban Transformer")
@@ -206,32 +207,32 @@ def main():
             def fA():
                 query = createRunInfoQuery(dataXML, trialID, experimentID, host)
                 query = sc.parallelize([query])
-                query.saveToCassandra(cassandraKeyspace, "faban_run_info", ttl=timedelta(hours=1))
+                query.saveToCassandra(cassandraKeyspace, "faban_run_info")
             
             def fB():
                 query = createDriverSummaryQuery(dataXML, trialID, experimentID, host)
                 query = sc.parallelize(query)
-                query.saveToCassandra(cassandraKeyspace, "faban_driver_summary", ttl=timedelta(hours=1))
+                query.saveToCassandra(cassandraKeyspace, "faban_driver_summary")
                 
             def fC():
                 query = createDriverMixQuery(dataXML, trialID, experimentID, host)
                 query = sc.parallelize(query)
-                query.saveToCassandra(cassandraKeyspace, "faban_driver_mix", ttl=timedelta(hours=1))
+                query.saveToCassandra(cassandraKeyspace, "faban_driver_mix")
                 
             def fD():
                 query = createDriverResponseTimesQuery(dataXML, trialID, experimentID, host)
                 query = sc.parallelize(query)
-                query.saveToCassandra(cassandraKeyspace, "faban_driver_response_times", ttl=timedelta(hours=1))
+                query.saveToCassandra(cassandraKeyspace, "faban_driver_response_times")
                 
             def fE():
                 query = createDriverDelayTimesQuery(dataXML, trialID, experimentID, host)
                 query = sc.parallelize(query)
-                query.saveToCassandra(cassandraKeyspace, "faban_driver_delay_times", ttl=timedelta(hours=1))
+                query.saveToCassandra(cassandraKeyspace, "faban_driver_delay_times")
                 
             def fF():
                 query = createDriverCustomStatsQuery(dataXML, trialID, experimentID, host)
                 query = sc.parallelize(query)
-                query.saveToCassandra(cassandraKeyspace, "faban_driver_custom_stats", ttl=timedelta(hours=1))
+                query.saveToCassandra(cassandraKeyspace, "faban_driver_custom_stats")
                 
             tA = threading.Thread(target=fA)
             tB = threading.Thread(target=fB)
@@ -259,8 +260,8 @@ def main():
             data = data.readlines()
             
             query = createDetailsQuery(data, trialID, experimentID, host)       
-            query = sc.parallelize(query)
-            query.saveToCassandra(cassandraKeyspace, "faban_details", ttl=timedelta(hours=1))
+            query = sc.parallelize(query, sc.defaultParallelism * partitionsPerCore)
+            query.saveToCassandra(cassandraKeyspace, "faban_details")
             
     
 if __name__ == '__main__':

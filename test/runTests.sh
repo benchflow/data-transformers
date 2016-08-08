@@ -2,12 +2,13 @@
 
 echo "Starting Python tests"
 
-python2.7 /test/python/statsTests.py
-python2.7 /test/python/mysqlTests.py
-python2.7 /test/python/propertiesTests.py
+/usr/bin/python2.7 /test/python/statsTests.py
+/usr/bin/python2.7 /test/python/mysqlTests.py
+/usr/bin/python2.7 /test/python/propertiesTests.py
 
 echo "Starting Spark tests"
 
+PYSPARK_PYTHON=/usr/bin/python2.7
 SPARK_MASTER=local[*]
 PYSPARK_CASSANDRA=/pyspark-cassandra-assembly-0.3.5.jar
 SUT_TEST_CONFIGURATION_FILE=/test/sut/wfms/camunda/3.5.0-3.7.0/data-transformers.configuration.yml

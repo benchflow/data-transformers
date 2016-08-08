@@ -243,7 +243,7 @@ def main():
     
     query = createContainerDict(inspectData, trialID, experimentID, containerID, hostID)
     query = sc.parallelize([query])
-    query.saveToCassandra(cassandraKeyspace, "container_properties", ttl=timedelta(hours=1))
+    query.saveToCassandra(cassandraKeyspace, "container_properties")
     
     infoData = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_info.gz").readlines()[0]
     
@@ -255,7 +255,7 @@ def main():
         query = createInfoDict(infoData)
         query.update(createVersionDict(versionData))
         query = sc.parallelize([query])
-        query.saveToCassandra(cassandraKeyspace, "host_properties", ttl=timedelta(hours=1))
+        query.saveToCassandra(cassandraKeyspace, "host_properties")
     
 if __name__ == '__main__':
     main()
