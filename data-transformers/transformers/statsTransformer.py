@@ -77,6 +77,15 @@ def createIODict(a, trialID, experimentID, containerID, hostID):
     ob = json.loads(a.decode())
     dicts = []
     dd = {}
+    if not "io_service_bytes_recursive" in ob["blkio_stats"]:
+        d = {}
+        d["io_data_id"] = uuid.uuid1().urn[9:]
+        d["trial_id"] = trialID
+        d["experiment_id"] = experimentID
+        d["container_id"] = containerID
+        d["host_id"] = hostID
+        dicts.append(d)
+        return dicts
     for dev in ob["blkio_stats"]["io_service_bytes_recursive"]:
         devName = ""
         if "major" in dev.keys():
