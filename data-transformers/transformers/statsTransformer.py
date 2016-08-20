@@ -222,10 +222,6 @@ def main():
     ####################
     f = lambda a: createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus)
     query = data.map(f)
-    try: 
-        query.saveAsTextFile("alluxio://"+alluxioHost+":19998/"+trialID+"_"+experimentID+"_"+containerID+"_"+hostID+"_environment_data")
-    except:
-        print("Could not save on alluxio file "+trialID+"_"+containerID+"_environment_data")
     query.saveToCassandra(cassandraKeyspace, statsTable)
     
     
@@ -247,7 +243,7 @@ def main():
     
     if networkDataAvailable:
         f = lambda a: createNetworkDict(a, trialID, experimentID, containerID, hostID)
-        query = statsRDD.map(f).reduce(lambda a, b: a+b)
+        query = data.map(f).reduce(lambda a, b: a+b)
     else: 
         net = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_network.gz")
         net = net.readlines()
@@ -256,11 +252,6 @@ def main():
         top = top.readlines()
         
         query = createNetworkHostQuery(sc, top, net, trialID, experimentID, containerID, hostID)
-        
-    try: 
-        query.saveAsTextFile("alluxio://"+alluxioHost+":19998/"+trialID+"_"+containerID+"_environment_data")
-    except:
-        print("Could not save on alluxio file "+trialID+"_"+containerID+"_environment_data")
         
     sc.parallelize(query).saveToCassandra(cassandraKeyspace, "network_interface_data")
     
