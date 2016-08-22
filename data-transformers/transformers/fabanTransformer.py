@@ -105,6 +105,8 @@ def createDriverDelayTimesQuery(data, trialID, experimentID, host):
 def createDriverCustomStatsQuery(data, trialID, experimentID, host):
     queries = []
     for driver in data.findall("driverSummary"):
+        if driver.find("customStats") is None:
+            return queries
         for stat in driver.find("customStats"):
             query = {}
             query["trial_id"] = trialID
@@ -231,8 +233,9 @@ def main():
                 
             def fF():
                 query = createDriverCustomStatsQuery(dataXML, trialID, experimentID, host)
-                query = sc.parallelize(query)
-                query.saveToCassandra(cassandraKeyspace, "faban_driver_custom_stats")
+                if len(query) != 0:
+                    query = sc.parallelize(query)
+                    query.saveToCassandra(cassandraKeyspace, "faban_driver_custom_stats")
                 
             tA = threading.Thread(target=fA)
             tB = threading.Thread(target=fB)
