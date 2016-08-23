@@ -136,7 +136,7 @@ def createVersionDict(a):
     d = {}
     for data in ob:
         data = data.split("=")
-        print data
+        # print data
         if data[0] == "Version":
             d["docker_version"] = data[1]
             continue
