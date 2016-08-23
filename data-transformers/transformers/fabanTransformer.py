@@ -6,7 +6,7 @@ import threading
 from datetime import timedelta
 import dateutil.parser as dateparser
 
-def createRunInfoQuery(data, trialID, experimentID, host):
+def createRunInfoQuery(data, trialID, experimentID, host, runStatus):
     query = {}
     query["trial_id"] = trialID
     query["experiment_id"] = experimentID
@@ -21,6 +21,7 @@ def createRunInfoQuery(data, trialID, experimentID, host):
     query["metric_unit"] = benchSum.find("metric").attrib["unit"]
     query["metric_value"] = benchSum.find("metric").text
     query["passed"] = benchSum.find("passed").text
+    query["status"] = runStatus
     return query
 
 def createDriverSummaryQuery(data, trialID, experimentID, host):
@@ -77,7 +78,10 @@ def createDriverResponseTimesQuery(data, trialID, experimentID, host):
                 query["host"] = host
                 query["driver_name"] = driver.attrib["name"]
                 query["op_name"] = operation.attrib["name"]
-                query["stat_name"] = stat.tag
+                if stat.tag == "percentile":
+                    query["stat_name"] = stat.tag+"_"+stat.attrib["nth"]+"_"+stat.attrib["suffix"]
+                else:
+                    query["stat_name"] = stat.tag
                 query["stat_value"] = stat.text
                 query["passed"] = operation.find("passed").text
                 queries.append(query)
@@ -197,6 +201,14 @@ def main():
     
     minioPaths = getMinioPaths(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath)
     
+    runStatus = None
+    for path in minioPaths:
+        if "resultinfo" in path:
+            data = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, path)
+            data = data.readline()
+            runStatus = data.split("\t")[0]
+            break
+    
     for path in minioPaths:
         if "summary.xml" in path:     
             host = getHostName(path)
@@ -207,7 +219,7 @@ def main():
             dataXML = xml.fromstring(data)
             
             def fA():
-                query = createRunInfoQuery(dataXML, trialID, experimentID, host)
+                query = createRunInfoQuery(dataXML, trialID, experimentID, host, runStatus)
                 query = sc.parallelize([query])
                 query.saveToCassandra(cassandraKeyspace, "faban_run_info")
             
