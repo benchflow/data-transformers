@@ -62,7 +62,7 @@ def createContainerDict(a, trialID, experimentID, containerID, hostID):
         d["privileged"] = ob["HostConfig"]["Privileged"]
     if "ReadonlyRootfs" in ob["HostConfig"].keys():
         d["read_only"] = ob["HostConfig"]["ReadonlyRootfs"]
-    if "RestartPolicy" in ob["HostConfig"].keys():
+    if "RestartPolicy" in ob["HostConfig"].keys() and "Name" in ob["HostConfig"]["RestartPolicy"]:
         d["restart_policy"] = ob["HostConfig"]["RestartPolicy"]["Name"]
     if "Name" in ob.keys():
         d["name"] = ob["Name"].replace("/", "")
