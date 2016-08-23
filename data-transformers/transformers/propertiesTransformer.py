@@ -75,91 +75,60 @@ def createContainerDict(a, trialID, experimentID, containerID, hostID):
 def createInfoDict(a):
     ob = json.loads(a.decode())
     d = {}
-    for data in ob:
-        data = data.split("=")
-        if data[0] == "ID":
-            d["host_id"] = data[1]
-            continue
-        elif data[0] == "CpuCfsPeriod":
-            d["cpu_cfs_period"] = data[1]
-            continue
-        elif data[0] == "CpuCfsQuota":
-            d["cpu_cfs_quota"] = data[1]
-            continue
-        elif data[0] == "Debug":
-            d["debug"] = data[1]
-            continue
-        elif data[0] == "Driver":
-            d["driver"] = data[1]
-            continue
-        elif data[0] == "DockerRootDir":
-            d["docker_root_dir"] = data[1]
-            continue
-        elif data[0] == "ExecutionDriver":
-            d["execution_driver"] = data[1]
-            continue
-        elif data[0] == "ExperimentalBuild":
-            d["experimental_build"] = data[1]
-            continue
-        elif data[0] == "HttpProxy":
-            d["http_proxy"] = data[1]
-            continue
-        elif data[0] == "HttpsProxy":
-            d["https_proxy"] = data[1]
-            continue
-        elif data[0] == "IPv4Forwarding":
-            d["ipv4_forwarding"] = data[1]
-            continue
-        elif data[0] == "IndexServerAddress":
-            d["index_server_address"] = data[1]
-            continue
-        elif data[0] == "KernelVersion":
-            d["kernel_version"] = data[1]
-            continue
-        elif data[0] == "Labels":
-            d["labels"] = data[1]
-            continue
-        elif data[0] == "MemoryLimit":
-            d["memory_limit"] = data[1]
-            continue
-        elif data[0] == "MemTotal":
-            d["mem_total"] = data[1]
-            continue
-        elif data[0] == "NCPU":
-            d["n_cpu"] = data[1]
-            continue
-        elif data[0] == "NEventsListener":
-            d["n_events_listener"] = data[1]
-            continue
-        elif data[0] == "NFd":
-            d["n_fd"] = data[1]
-            continue
-        elif data[0] == "NGoroutines":
-            d["n_goroutines"] = data[1]
-            continue
-        elif data[0] == "Name":
-            d["name"] = data[1]
-            continue
-        elif data[0] == "NoProxy":
-            d["no_proxy"] = data[1]
-            continue
-        elif data[0] == "OomKillDisable":
-            d["oom_kill_disable"] = data[1]
-            continue
-        elif data[0] == "OperatingSystem":
-            d["operating_system"] = data[1]
-            continue
-        elif data[0] == "SwapLimit":
-            d["swap_limit"] = data[1]
-            continue
-        elif data[0] == "SystemTime":
-            d["system_time"] = data[1]
-            continue
-        elif data[0] == "ServerVersion":
-            d["server_version"] = data[1]
-            continue
-        else:
-            continue
+    if "ID" in ob.keys():
+        d["host_id"] = ob["ID"]  
+    if "CpuCfsPeriod" in ob.keys():
+        d["cpu_cfs_period"] = ob["cpu_cfs_period"]
+    if "CpuCfsQuota" in ob.keys():
+        d["cpu_cfs_quota"] = ob["CpuCfsQuota"]
+    if "Debug" in ob.keys():
+        d["debug"] = ob["Debug"]
+    if "Driver" in ob.keys():
+        d["driver"] = ob["Driver"]
+    if "DockerRootDir" in ob.keys():
+        d["docker_root_dir"] = ob["DockerRootDir"]
+    if "ExecutionDriver" in ob.keys():
+        d["execution_driver"] = ob["ExecutionDriver"]
+    if "ExperimentalBuild" in ob.keys():
+        d["experimental_build"] = ob["ExperimentalBuild"]
+    if "HttpProxy" in ob.keys():
+        d["http_proxy"] = ob["HttpProxy"]
+    if "HttpsProxy" in ob.keys():
+        d["https_proxy"] = ob["HttpsProxy"]
+    if "IPv4Forwarding" in ob.keys():
+        d["ipv4_forwarding"] = ob["IPv4Forwarding"]
+    if "IndexServerAddress" in ob.keys():
+        d["index_server_address"] = ob["IndexServerAddress"]
+    if "KernelVersion" in ob.keys():
+        d["kernel_version"] = ob["KernelVersion"]
+    if "Labels" in ob.keys():
+        d["labels"] = ob["Labels"]
+    if "MemoryLimit" in ob.keys():
+        d["memory_limit"] = ob["MemoryLimit"]
+    if "MemTotal" in ob.keys():
+        d["mem_total"] = ob["MemTotal"]
+    if "NCPU" in ob.keys():
+        d["n_cpu"] = ob["NCPU"]
+    if "NEventsListener" in ob.keys():
+        d["n_events_listener"] = ob["NEventsListener"]
+    if "NFd" in ob.keys():
+        d["n_fd"] = ob["NFd"]
+    if "NGoroutines" in ob.keys():
+        d["n_goroutines"] = ob["NGoroutines"]
+    if "Name" in ob.keys():
+        d["name"] = ob["Name"]
+    if "NoProxy" in ob.keys():
+        d["no_proxy"] = ob["NoProxy"]
+    if "OomKillDisable" in ob.keys():
+        d["oom_kill_disable"] = ob["OomKillDisable"]
+    if "OperatingSystem" in ob.keys():
+        d["operating_system"] = ob["OperatingSystem"]
+    if "SwapLimit" in ob.keys():
+        d["swap_limit"] = ob["SwapLimit"]
+    if "SystemTime" in ob.keys():
+        d["system_time"] = ob["SystemTime"]
+    if "ServerVersion" in ob.keys():
+        d["server_version"] = ob["ServerVersion"]
     return d
 
 def createVersionDict(a):
@@ -197,17 +166,20 @@ def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
     return getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path)
 
 def hostNeedsSaving(sc, infoData, cassandraKeyspace):
-    hostID = ""
-    
     ob = json.loads(infoData.decode())
-    for e in ob:
-        e = e.split("=")
-        if e[0] == "ID":
-            hostID = e[1]
-            break
-    
-    if hostID == "":
+    if "ID" in ob.keys():
+        hostID = ob["ID"]
+    else:
         return false
+    
+    #for e in ob:
+    #    e = e.split("=")
+    #    if e[0] == "ID":
+    #        hostID = e[1]
+    #        break
+    
+    #if hostID == "":
+    #    return false
     
     hostNotSaved = sc.cassandraTable(cassandraKeyspace, "host_properties") \
         .select("host_id") \
