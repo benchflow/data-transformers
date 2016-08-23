@@ -151,7 +151,7 @@ def createNetworkHostQuery(sc, top, net, trialID, experimentID, containerID, hos
         data = json.loads(a.decode())
         pids = []
         for p in data["Processes"]:
-            pids.append(p[2])
+            pids.append(p[1])
         return pids
     PIDS = sc.parallelize(top).map(getPid).reduce(lambda a, b: a+b)
     
