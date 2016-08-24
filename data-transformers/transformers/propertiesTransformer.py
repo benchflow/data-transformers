@@ -19,12 +19,12 @@ def createContainerDict(a, trialID, experimentID, containerID, hostID):
     d["host_id"] = hostID
     if "Env" in ob["Config"].keys():
         d["environment"] = ob["Config"]["Env"]
-    if "Image" in ob.keys():
-        d["image"] = ob["Image"]
-    if "Labels" in ob.keys():
+    if "Image" in ob["Config"].keys():
+        d["image"] = ob["Config"]["Image"]
+    if "Labels" in ob["Config"].keys():
         labelsList = []
-        for k in ob["Labels"]:
-            labelsList.append(k+":"+ob["Labels"][k])
+        for k in ob["Config"]["Labels"]:
+            labelsList.append(k+":"+ob["Config"]["Labels"][k])
         d["labels"] = labelsList
     if "Ulimits" in ob["HostConfig"].keys():
         ul = {}
@@ -66,8 +66,8 @@ def createContainerDict(a, trialID, experimentID, containerID, hostID):
         d["restart_policy"] = ob["HostConfig"]["RestartPolicy"]["Name"]
     if "Name" in ob.keys():
         d["name"] = ob["Name"].replace("/", "")
-    if "Driver" in ob.keys():
-        d["log_driver"] = ob["Driver"]
+    if "LogConfig" in ob["HostConfig"].keys() and "Type" in ob["HostConfig"]["LogConfig"].keys():
+        d["log_driver"] = ob["HostConfig"]["LogConfig"]["Type"]
     if "User" in ob["Config"].keys():
         d["user"] = ob["Config"]["User"]
     return d
@@ -78,7 +78,7 @@ def createInfoDict(a):
     if "ID" in ob.keys():
         d["host_id"] = ob["ID"]  
     if "CpuCfsPeriod" in ob.keys():
-        d["cpu_cfs_period"] = ob["cpu_cfs_period"]
+        d["cpu_cfs_period"] = ob["CpuCfsPeriod"]
     if "CpuCfsQuota" in ob.keys():
         d["cpu_cfs_quota"] = ob["CpuCfsQuota"]
     if "Debug" in ob.keys():
@@ -136,7 +136,6 @@ def createVersionDict(a):
     d = {}
     for data in ob:
         data = data.split("=")
-        # print data
         if data[0] == "Version":
             d["docker_version"] = data[1]
             continue
