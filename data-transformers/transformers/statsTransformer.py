@@ -9,7 +9,7 @@ import yaml
 from datetime import timedelta
 
 # Creates a dictionary
-def createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus):
+def createEDDict(a, trialID, experimentID, containerID, containerName, hostID, activeCpus):
     ob = json.loads(a.decode())
     d = {}
     if (ob["precpu_stats"]["cpu_usage"] is not None) and ("total_usage" in ob["precpu_stats"]["cpu_usage"].keys()):
@@ -24,6 +24,7 @@ def createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus):
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
     d["container_id"] = containerID
+    d["container_name"] = containerName
     d["host_id"] = hostID
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
@@ -194,6 +195,7 @@ def main():
     trialID = str(args["trial_id"])
     experimentID = str(args["experiment_id"])
     containerID = str(args["container_id"])
+    containerName = str(args["container_name"])
     hostID = str(args["host_id"])
     partitionsPerCore = 5
     
@@ -220,7 +222,7 @@ def main():
     
     # Saving Stats data
     ####################
-    f = lambda a: createEDDict(a, trialID, experimentID, containerID, hostID, activeCpus)
+    f = lambda a: createEDDict(a, trialID, experimentID, containerID, containerName, hostID, activeCpus)
     query = data.map(f)
     query.saveToCassandra(cassandraKeyspace, statsTable)
     
