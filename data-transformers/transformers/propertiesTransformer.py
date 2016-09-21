@@ -8,7 +8,7 @@ import yaml
 
 from datetime import timedelta
 
-# Creates a dictionary
+#Function to create the Cassandra query for the container properties
 def createContainerDict(a, trialID, experimentID, containerID, hostID):
     ob = json.loads(a.decode())
     d = {}
@@ -72,6 +72,7 @@ def createContainerDict(a, trialID, experimentID, containerID, hostID):
         d["user"] = ob["Config"]["User"]
     return d
 
+#Function to create the Cassandra query for the host properties (the info data)
 def createInfoDict(a):
     ob = json.loads(a.decode())
     d = {}
@@ -131,6 +132,7 @@ def createInfoDict(a):
         d["server_version"] = ob["ServerVersion"]
     return d
 
+#Function to create the Cassandra query for the Docker version data
 def createVersionDict(a):
     ob = json.loads(a.decode())
     d = {}
@@ -159,11 +161,12 @@ def createVersionDict(a):
             continue
     return d
 
-
+#Function to get the raw data from Minio
 def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
     from commons import getFromMinio
     return getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path)
 
+#Function to check if the host data needs to be saved again, checking if the host data are already on Cassandra
 def hostNeedsSaving(sc, infoData, cassandraKeyspace):
     ob = json.loads(infoData.decode())
     if "ID" in ob.keys():
@@ -209,19 +212,22 @@ def main():
     # Set configuration for spark context
     conf = SparkConf().setAppName("Properties Transformer")
     sc = CassandraSparkContext(conf=conf)
-     
+    
+    #Get the container properties data
     inspectData = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_inspect.gz").readlines()[0] 
     
+    #Transform container properties and save to Cassandra
     query = createContainerDict(inspectData, trialID, experimentID, containerID, hostID)
     query = sc.parallelize([query])
     query.saveToCassandra(cassandraKeyspace, "container_properties")
     
+    #Get the host properties data
     infoData = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_info.gz").readlines()[0]
-    
+    #Get the Docker version data
     versionData = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_version.gz").readlines()[0]
-    
+    #Check if we need to save the host properties
     hostNotSaved = hostNeedsSaving(sc, infoData, cassandraKeyspace)
-        
+    #If host needs to be saved, transform and save data
     if hostNotSaved:
         query = createInfoDict(infoData)
         query.update(createVersionDict(versionData))

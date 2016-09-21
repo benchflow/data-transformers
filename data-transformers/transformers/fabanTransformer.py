@@ -6,6 +6,7 @@ import threading
 from datetime import timedelta
 import dateutil.parser as dateparser
 
+#Function to create the Cassandra query for the Faban run info
 def createRunInfoQuery(data, trialID, experimentID, host, runStatus):
     query = {}
     query["trial_id"] = trialID
@@ -24,8 +25,10 @@ def createRunInfoQuery(data, trialID, experimentID, host, runStatus):
     query["status"] = runStatus
     return query
 
+#Function to create the Cassandra query for the Faban driver summary data
 def createDriverSummaryQuery(data, trialID, experimentID, host):
     queries = []
+    #Iterating over all the drivers the file provides data for
     for driver in data.findall("driverSummary"):
         query = {}
         query["trial_id"] = trialID
@@ -46,9 +49,12 @@ def createDriverSummaryQuery(data, trialID, experimentID, host):
         queries.append(query)
     return queries
 
+#Function to create the Cassandra query for the Faban data regarding mix values for the drivers
 def createDriverMixQuery(data, trialID, experimentID, host):
     queries = []
+    #Iterating over all the drivers the file provides data for
     for driver in data.findall("driverSummary"):
+        #Iterating over all operations defined in a driver
         for operation in driver.find("mix"):
             query = {}
             query["trial_id"] = trialID
@@ -65,10 +71,14 @@ def createDriverMixQuery(data, trialID, experimentID, host):
             queries.append(query)
     return queries
 
+#Function to create the Cassandra query for the Faban response times data
 def createDriverResponseTimesQuery(data, trialID, experimentID, host):
     queries = []
+    #Iterating over all the drivers the file provides data for
     for driver in data.findall("driverSummary"):
+        #Iterating over all operations defined in a driver
         for operation in driver.find("responseTimes"):
+            #Iterating over every stat and taking name and value
             for stat in operation:
                 if "passed" in stat.tag:
                     continue
@@ -78,6 +88,7 @@ def createDriverResponseTimesQuery(data, trialID, experimentID, host):
                 query["host"] = host
                 query["driver_name"] = driver.attrib["name"]
                 query["op_name"] = operation.attrib["name"]
+                #Special case for percentile stats
                 if stat.tag == "percentile":
                     query["stat_name"] = stat.tag+"_"+stat.attrib["nth"]+"_"+stat.attrib["suffix"]
                 else:
@@ -87,9 +98,12 @@ def createDriverResponseTimesQuery(data, trialID, experimentID, host):
                 queries.append(query)
     return queries
 
+#Function to create the Cassandra query for the Faban delay times data
 def createDriverDelayTimesQuery(data, trialID, experimentID, host):
     queries = []
+    #Iterating over all the drivers the file provides data for
     for driver in data.findall("driverSummary"):
+        #Iterating over every stat and taking name and value
         for operation in driver.find("delayTimes"):
             query = {}
             query["trial_id"] = trialID
@@ -106,11 +120,15 @@ def createDriverDelayTimesQuery(data, trialID, experimentID, host):
             queries.append(query)
     return queries
 
+#Function to create the Cassandra query for the Faban custom stats
 def createDriverCustomStatsQuery(data, trialID, experimentID, host):
     queries = []
+    #Iterating over all the drivers the file provides data for
     for driver in data.findall("driverSummary"):
+        #Checking if custom stats are available
         if driver.find("customStats") is None:
             return queries
+        #Iterating over every stats and saving name, description and value
         for stat in driver.find("customStats"):
             query = {}
             query["trial_id"] = trialID
@@ -124,8 +142,10 @@ def createDriverCustomStatsQuery(data, trialID, experimentID, host):
             queries.append(query)
     return queries
 
+#Function to create the Cassandra query for the Faban data contained in the details.xan file
 def createDetailsQuery(data, trialID, experimentID, host):
     firstSectionIndex = 0
+    #Locate the first section in the file
     for index, value in enumerate(data):
         if "Section" in value and "Benchmark" not in value:
             firstSectionIndex = index
@@ -135,17 +155,21 @@ def createDetailsQuery(data, trialID, experimentID, host):
     currentOps = []
     currentSection = ""
     timeUnit = ""
+    #Iterating over every line in the file, locating the sections, and constructing the queries for the data of each section
     for line in data:
+        #Get name of the current section we are on
         if "Section" in line:
             currentSection = line.split(":")[1]
             if "(" in currentSection.split()[-1] and ")" in currentSection.split()[1]:
                 timeUnit = line.split()[1]
+        #Get the operation we are on
         elif "Time" in line:
             if "(" in line.split()[1] and ")" in line.split()[1]:
                 timeUnit = line.split()[1]
                 currentOps = line.split()[2:]
             else:
                 currentOps = line.split()[1:]
+        #Construct queries with the actual values
         elif len(line.split()) > 0 and "--------" not in line and "Display" not in line:
             val = line.split()
             for index, value in enumerate(currentOps):
@@ -162,14 +186,17 @@ def createDetailsQuery(data, trialID, experimentID, host):
                 queries.append(query)
     return queries
 
+#Function to get all paths from Minio matching a prefix
 def getMinioPaths(minioHost, minioPort, accessKey, secretKey, bucket, path):
     from commons import getMinioPaths
     return getMinioPaths(minioHost, minioPort, accessKey, secretKey, bucket, path)
 
+#Function to get a file from Minio
 def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
     from commons import getFromMinio
     return getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path)
-        
+
+#Function to get the name of the host (driver) from the filename if possible. If the file is the one for all hosts, it's called "aggregate"
 def getHostName(path):
     fileName = path.split("/")[-1]
     host = "aggregate"
@@ -199,9 +226,11 @@ def main():
     conf = SparkConf().setAppName("Faban Transformer")
     sc = CassandraSparkContext(conf=conf)
     
+    #Get paths of all files on Minio we need
     minioPaths = getMinioPaths(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath)
     
     runStatus = None
+    #Creating queries for the resultinfo file
     for path in minioPaths:
         if "resultinfo" in path:
             data = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, path)
@@ -209,6 +238,7 @@ def main():
             runStatus = data.split("\t")[0]
             break
     
+    #Creating queries for the summary.xml files for all hosts, plus the aggregate one
     for path in minioPaths:
         if "summary.xml" in path:     
             host = getHostName(path)
@@ -248,7 +278,8 @@ def main():
                 if len(query) != 0:
                     query = sc.parallelize(query)
                     query.saveToCassandra(cassandraKeyspace, "faban_driver_custom_stats")
-                
+              
+            #Starting multiple threads to parallelise the execution  
             tA = threading.Thread(target=fA)
             tB = threading.Thread(target=fB)
             tC = threading.Thread(target=fC)
@@ -267,7 +298,7 @@ def main():
             tD.join()
             tE.join()
             tF.join()
-        
+        #Creating queries for the details.xan files for all hosts, plus the aggregate one
         elif "detail.xan" in path:
             host = getHostName(path)
             
