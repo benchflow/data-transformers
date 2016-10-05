@@ -3,7 +3,7 @@ FROM benchflow/data-analyses-scheduler:dev
 ENV PYSPARK_PYTHON python2.7
 ENV PYTHONPATH /data-transformers/transformers:/data-transformers/transformations
 ENV TRANSFORMERS_PATH /data-transformers
-	
+
 COPY $TRAVIS_BUILD_DIR/data-transformers /data-transformers
 COPY $TRAVIS_BUILD_DIR/test/python /test/python
 COPY $TRAVIS_BUILD_DIR/test/spark /test/spark
