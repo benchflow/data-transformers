@@ -2,6 +2,13 @@
 
 # Mainly used for running the test locally
 
+echo $"\n>>>Getting/Building the Latest Version of Docker Images"
+docker pull benchflow/minio:dev
+docker pull cassandra:3.7
+docker pull benchflow/data-analyses-scheduler:dev
+docker build -f ./test/Dockerfile.ci -t sparktests .
+echo $"\n>>>Got/Built the Latest Version of Docker Images"
+
 echo $"\n>>>Starting Minio"
 docker run --name minio -e "MINIO_ALIAS=benchflow" -e "MINIO_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE" -e "MINIO_SECRET_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" -d benchflow/minio:dev
 sleep 60
@@ -25,3 +32,7 @@ echo $"\n>>>Cassandra Schema Set Up Done"
 echo $"\n>>>Starting Tests"
 docker run --rm --name spark --link minio:minio --link cassandra:cassandra --entrypoint=/test/runTests.sh sparktests
 echo $"\n>>>Tests Done"
+
+echo $"\n>>>Removing all Test Containers"
+docker rm -f -v minio cassandra
+echo $"\n>>>All Test Containers Removed"
