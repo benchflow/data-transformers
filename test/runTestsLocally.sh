@@ -22,6 +22,8 @@ echo $"\n>>>Minio Data Copied"
 echo $"\n>>>Starting Cassandra"
 docker run -d --name cassandra cassandra:3.7
 sleep 60
+docker run -d --name cassandra2 --link cassandra:cassandra cassandra:3.7
+sleep 60
 echo $"\n>>>Cassandra Started"
 
 echo $"\n>>>Copying and Setting Up Cassandra Schema"
@@ -31,8 +33,9 @@ echo $"\n>>>Cassandra Schema Set Up Done"
 
 echo $"\n>>>Starting Tests"
 docker run --rm --name spark --link minio:minio --link cassandra:cassandra --entrypoint=/test/runTests.sh sparktests
+# docker run -ti --rm --name spark --link minio:minio --link cassandra:cassandra --entrypoint=sh sparktests
 echo $"\n>>>Tests Done"
 
 echo $"\n>>>Removing all Test Containers"
-docker rm -f -v minio cassandra
+docker rm -f -v minio cassandra cassandra2
 echo $"\n>>>All Test Containers Removed"

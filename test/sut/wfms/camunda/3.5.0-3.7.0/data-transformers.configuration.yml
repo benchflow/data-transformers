@@ -6,6 +6,7 @@ settings:
         START_TIME_: "start_time"
         END_TIME_: "end_time"
         PROC_DEF_ID_: "process_definition_id"
+        PROC_DEF_KEY_: "process_name"
         PROC_INST_ID_: "source_process_instance_id"
     - src_table: "ACT_HI_ACTINST"
       dest_table: "construct"

@@ -5,9 +5,8 @@ settings:
         DURATION_: "duration"
         START_TIME_: "start_time"
         END_TIME_: "end_time"
-        #TODO: currenlty acceptable, but we can do it better enabling the same column to be mapped to multiple benchflow columns, or taking data from other tables as well if needed
         PROC_DEF_ID_: "process_definition_id"
-        ID_: "process_name"
+        START_ACT_ID_: "process_name"
         PROC_INST_ID_: "source_process_instance_id"
     - src_table: "ACT_HI_ACTINST"
       dest_table: "construct"
