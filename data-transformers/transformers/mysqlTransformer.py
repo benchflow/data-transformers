@@ -9,6 +9,7 @@ import dateutil.parser as dateparser
 
 from datetime import timedelta
 
+#Function for filtering mock values
 def filterMock(a, limit):
     for e in a:
         if limit in e:
@@ -20,29 +21,35 @@ def createDic(a, trialID, experimentID, conf, types, schema, indexes):
     from dataTransformations import Transformations
     transformations = Transformations()
     d = {}
+    #Not recording values if the line is the schema
     if(a[0] == schema[0]):
         d["trial_id"] = trialID
         d["experiment_id"] = experimentID
         return d
+    #Iterate over the indexes and map to the corresponding column as defined in the configuration file
     for i in indexes:
         col = conf["column_mapping"][i]
         if conf.get("column_transformation") != None:
             t = conf["column_transformation"].get(i)
         else:
             t = None
+        #If defined as NULL, save it as type None
         if(a[indexes[i]].replace('"', '') == "NULL"):
             d[col] = None
             continue
+        #Apply transformation function if specified
         if(t == None):
             d[col] = convertType(a[indexes[i]].replace('"', ''), i, types)
         else:
             d[col] = eval("transformations."+t)(convertType(a[indexes[i]].replace('"', ''), i, types))
     d["trial_id"] = trialID
     d["experiment_id"] = experimentID
+    #If duration not present, use start time and end time to get the duration
     if "duration" not in d.keys() and "end_time" in d.keys() and "start_time" in d.keys():
         d["duration"] = (dateparser.parse(d["end_time"]) - dateparser.parse(d["start_time"])).seconds
     return d
 
+#Function to convert the data, which are strings to start, based on the type defined in the database schema
 def convertType(element, column, types):
     if types[column].startswith("varchar"):
         return element
@@ -54,15 +61,18 @@ def convertType(element, column, types):
         return long(element)
     return element
 
+#Function to retrieve the raw data from Minio
 def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
     from commons import getFromMinio
     return getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path)
-        
+
+#Function that marks N initial processes to be ignored
 def cutNInitialProcesses(dataRDD, nToIgnore):
     from pyspark_cassandra import CassandraSparkContext
     from pyspark_cassandra import RowFormat
     from pyspark import SparkConf
     
+    #Function to mark a process to be ignored if the time is lower than a maximum time
     def markToIgnore(e, maxTime, proc):
         if e['process_definition_id'] == proc and dateparser.parse(e["start_time"]) <= maxTime:
             e["to_ignore"] = True
@@ -76,10 +86,12 @@ def cutNInitialProcesses(dataRDD, nToIgnore):
     if dataRDD.isEmpty():
         return []
     
+    #Get all distinct processes
     processes = dataRDD.map(lambda r: r["process_definition_id"]) \
             .distinct() \
             .collect()
     
+    #For all processes, mark to ignore if start time lower than the start time of the Nth process
     for p in processes:
         time = dataRDD.filter(lambda r: r["process_definition_id"] == p) \
             .map(lambda r: (dateparser.parse(r["start_time"]), 0)) \
@@ -93,11 +105,13 @@ def cutNInitialProcesses(dataRDD, nToIgnore):
         dataRDD = dataRDD.map(lambda e: markToIgnore(e, time, p))
     return dataRDD
 
+#Function to mark construct to be ignored if belonging to processes that need to be ignored
 def cutConstructs(dataRDD, processesToIgnore):
     from pyspark_cassandra import CassandraSparkContext
     from pyspark_cassandra import RowFormat
     from pyspark import SparkConf
     
+    #Function that marks a construct to be ignored if belonging to a process that needs to be ignored
     def markToIgnore(e):
         if e["source_process_instance_id"] in processesToIgnore:
             e["to_ignore"] = True
@@ -142,16 +156,20 @@ def main():
         mappings = transformerConfiguration["settings"]
         limit = transformerConfiguration["limit_process_string_id"]
         nProcessesToIgnore = transformerConfiguration["n_processes_to_ignore"]
-        
+    
+    #Read the mappings of columns to columns for each defined table in the conf file 
     mappingsDict = {}
     for conf in mappings:
         mappingsDict[conf["dest_table"]] = conf
     mappings = [mappingsDict["process"], mappingsDict["construct"]]
-        
+    
+     #For each table, perform the mappings of columns
     for conf in mappings:
+        #Get Data from Minio and parallelize it with Spark
         lines = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"/"+conf["src_table"]+".csv.gz").readlines()
         data = sc.parallelize(lines[1:], sc.defaultParallelism * partitionsPerCore)
         
+        #Get schema from Minio and save types of the data
         lines2 = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"/"+conf["src_table"]+"_schema.csv.gz").readlines()   
         types = {}
         for line in lines2:
@@ -174,7 +192,8 @@ def main():
         query = data.map(lambda line: line.decode().split(",")) \
                     .filter(lambda a: filterMock(a, limit)) \
                     .map(lambda a: createDic(a, trialID, experimentID, conf, types, schema, indexes))
-                    
+        
+        #Mark processes and construct to be ignored        
         cutProcesses = []
         if conf["dest_table"] == "process":
             query = cutNInitialProcesses(query, nProcessesToIgnore)
@@ -182,6 +201,7 @@ def main():
         elif conf["dest_table"] == "construct":
             query = cutConstructs(query, cutProcesses)
         
+        #Save to Cassandra
         query.saveToCassandra(cassandraKeyspace, conf["dest_table"])
     
     # Save Database size    

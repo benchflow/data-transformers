@@ -8,16 +8,19 @@ import yaml
 
 from datetime import timedelta
 
-# Creates a dictionary
+#Creates the Cassandra query for the stats data
 def createEDDict(a, trialID, experimentID, containerID, containerName, hostID, activeCpus):
     ob = json.loads(a.decode())
     d = {}
+    #Computes the CPU percentage usage by using the difference between the current and previous CPU usage
     if (ob["precpu_stats"]["cpu_usage"] is not None) and ("total_usage" in ob["precpu_stats"]["cpu_usage"].keys()):
         cpu_percent = 0.0
         cpu_delta = float(ob["cpu_stats"]["cpu_usage"]["total_usage"]) - float(ob["precpu_stats"]["cpu_usage"]["total_usage"])
         system_delta = float(ob["cpu_stats"]["system_cpu_usage"]) - float(ob["precpu_stats"]["system_cpu_usage"])
         if system_delta > 0.0 and cpu_delta > 0.0:
+            #Compute percentage usage using the ratio between container cpu usage and system cpu usage deltas
             cpu_percent = (cpu_delta / system_delta) * float(len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])) * 100.0
+            #Divides by number of active CPU to obtain percentage that is 100% for max usage of all cores
             cpu_percent = cpu_percent/activeCpus
         d["cpu_percent_usage"] = cpu_percent
     d["environment_data_id"] = uuid.uuid1().urn[9:]
@@ -29,6 +32,7 @@ def createEDDict(a, trialID, experimentID, containerID, containerName, hostID, a
     d["read_time"] = ob["read"]
     d["cpu_total_usage"] = long(ob["cpu_stats"]["cpu_usage"]["total_usage"])
     perCpuUsages = []
+    #Compute the CPU usage per CPU core
     if (ob["precpu_stats"]["cpu_usage"] is not None) and ("percpu_usage" in ob["precpu_stats"]["cpu_usage"].keys()):
         for i in range(len(ob["cpu_stats"]["cpu_usage"]["percpu_usage"])):
             cpu_percent = 0.0
@@ -44,6 +48,7 @@ def createEDDict(a, trialID, experimentID, containerID, containerName, hostID, a
     d["memory_max_usage"] = float(ob["memory_stats"]["max_usage"]/(1024*1024))
     return d
 
+#Creates the Cassandra query for the network data when net is not set to host on a container
 def createNetworkDict(a, trialID, experimentID, containerID, hostID):
     ob = json.loads(a.decode())
     dicts = []
@@ -62,6 +67,7 @@ def createNetworkDict(a, trialID, experimentID, containerID, hostID):
         dicts.append(d)
     return dicts
 
+#Creates the Cassandra query for the network data when net is set to host on a container
 def createHostNetworkDict(a, trialID, experimentID, containerID, hostID):
     d = {}
     d["network_interface_data_id"] = uuid.uuid1().urn[9:]
@@ -74,10 +80,12 @@ def createHostNetworkDict(a, trialID, experimentID, containerID, hostID):
     d["network_rx_bytes"] = a[1]
     return d
 
+#Creates the Cassandra query for the IO data
 def createIODict(a, trialID, experimentID, containerID, hostID):
     ob = json.loads(a.decode())
     dicts = []
     dd = {}
+    #If IO data not available, save nothing
     if not "io_service_bytes_recursive" in ob["blkio_stats"]:
         d = {}
         d["io_data_id"] = uuid.uuid1().urn[9:]
@@ -87,6 +95,7 @@ def createIODict(a, trialID, experimentID, containerID, hostID):
         d["host_id"] = hostID
         dicts.append(d)
         return dicts
+    #Save the names of all devices that have IO data
     for dev in ob["blkio_stats"]["io_service_bytes_recursive"]:
         devName = ""
         if "major" in dev.keys():
@@ -94,6 +103,7 @@ def createIODict(a, trialID, experimentID, containerID, hostID):
         if "minor" in dev.keys():
             devName = devName + "_" + str(dev["minor"])
         dd[devName] = {}
+    #Iterate over all devices and save the IO data
     for dev in ob["blkio_stats"]["io_service_bytes_recursive"]:
         if "value" in dev.keys():
             if dev["op"] == "Read":
@@ -106,6 +116,7 @@ def createIODict(a, trialID, experimentID, containerID, hostID):
                 dd[devName]["async"] = dev["value"]
             if dev["op"] == "Total":
                 dd[devName]["total"] = dev["value"]
+    #Construct queries for all the data, for all devices
     for k in dd.keys():
         d = {}
         d["io_data_id"] = uuid.uuid1().urn[9:]
@@ -137,6 +148,7 @@ def createIODict(a, trialID, experimentID, containerID, hostID):
         dicts.append(d)
     return dicts
 
+#From the nethogs file, obtain the total bytes reported for all processes that are in the list of PIDS of the observed container
 def getBytesSumForContainerPIDS(e, PIDS):
     e = filter((lambda a: not "Refreshing" in a), e)
     e = map((lambda a: a.strip("\n").split("\t")), e)
@@ -147,33 +159,41 @@ def getBytesSumForContainerPIDS(e, PIDS):
     e = reduce((lambda a, b: (a[0]+b[0],a[1]+b[1])), e)
     return e
 
+#Function to create the queries for the network data when container is set to net=host
 def createNetworkHostQuery(sc, top, net, trialID, experimentID, containerID, hostID):
+    #Function to get the pids from the container processes
     def getPid(a):
         data = json.loads(a.decode())
         pids = []
         for p in data["Processes"]:
             pids.append(p[1])
         return pids
+    
+    #Retrieve the PIDS of all processes ever run in the container
     PIDS = sc.parallelize(top).map(getPid).reduce(lambda a, b: a+b)
     
     netPerSecond = []
     chunk = []
+    #Read data from the nethogs file in chunks (every chunk starts with "Refreshing")
     for line in net[1:]:
         if "Refreshing" in line:
             netPerSecond.append(chunk)
             chunk = []
         else:
             chunk.append(line)
-
+    
+    #For every chunk, retrieve the net usage, only counting the processes in the PIDS list
     data = sc.parallelize(netPerSecond).map(lambda a: getBytesSumForContainerPIDS(a, PIDS)).collect()
     i = 0
     for i in range(len(data)-1):
         data[i+1] = (data[i+1][0]+data[i][0], data[i+1][0]+data[i][1])
     
+    #Create queries and save to Cassandra
     f = lambda a: createHostNetworkDict(a, trialID, experimentID, containerID, hostID)
     query = sc.parallelize(data).map(f).collect()
     return query
 
+#Functin to retrieve raw data from Minio
 def getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path):
     from commons import getFromMinio
     return getFromMinio(minioHost, minioPort, accessKey, secretKey, bucket, path)
@@ -199,6 +219,7 @@ def main():
     hostID = str(args["host_id"])
     partitionsPerCore = 5
     
+    #Source and destination tables
     statsTable = "environment_data"
     ioTable = "io_data"
     alluxioHost = "localhost"
@@ -207,9 +228,11 @@ def main():
     conf = SparkConf().setAppName("Stats Transformer")
     sc = CassandraSparkContext(conf=conf)
     
+    #Get raw data from Minio
     lines = getFromMinio(minioHost, minioPort, minioAccessKey, minioSecretKey, fileBucket, filePath+"_stats.gz").readlines()
     data = sc.parallelize(lines, sc.defaultParallelism * partitionsPerCore)
     
+    #Get the number of CPUs that were actually active in the execution by checking how many were different from 0 during the course of the run
     activeCpus = 0
     for l in lines:
         acpus = 0
